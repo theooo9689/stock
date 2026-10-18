@@ -37,6 +37,13 @@ def main():
         if executable.is_file():
             subprocess.Popen([str(executable), 'serve'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            # Avoid freezing a factual edition while the new Ollama process is still binding its port.
+            for _ in range(10):
+                try:
+                    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:11434/api/tags', timeout=1):
+                        break
+                except Exception:
+                    time.sleep(0.5)
 
     def once():
         settings = None
