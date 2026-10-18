@@ -1,0 +1,38 @@
+assets:
+  us_etfs: [AVUV, AVDV, JEPI, JEPQ, SCHD, VOO, IVV, SPY, QQQ, XLE]
+  br_etfs: [IVVB11, WRLD11, HASH11, GOLD11, BOVA11, NASD11, DIVO11]
+  stocks: [EME, FIS, ORCL, CRWV, AAOI, AMKR, NBIS, VRT]
+  crypto:
+    BTC: bitcoin
+    ETH: ethereum
+    SOL: solana
+    BNB: binancecoin
+    XRP: ripple
+    LINK: chainlink
+    AVAX: avalanche-2
+    ADA: cardano
+    HYPE: hyperliquid
+market_symbols:
+  HYPE: HYPE32196-USD
+discovery:
+  enabled: true
+  max_candidates: 15
+  crypto_candidates: 3
+  min_market_cap: 1000000000
+  min_dollar_volume: 10000000
+  screeners: [undervalued_growth_stocks, undervalued_large_caps, growth_technology_stocks, most_actives, top_etfs]
+weights:
+  stocks: {valuation: 0.25, quality: 0.25, growth: 0.15, safety: 0.15, technical: 0.10, macro: 0.10}
+  etfs: {cost: 0.20, diversification: 0.25, liquidity: 0.20, strategy: 0.15, technical: 0.10, macro: 0.10}
+  crypto: {adoption: 0.25, tokenomics: 0.20, liquidity: 0.20, safety: 0.15, technical: 0.10, macro: 0.10}
+valuation:
+  discount_rates: [0.12, 0.10, 0.08]
+  growth_rates: [0.00, 0.05, 0.10]
+  terminal_growth: 0.025
+  margin_of_safety: 0.25
+  normalized_pe: [12, 18, 24]
+news_feeds:
+  - https://www.federalreserve.gov/feeds/press_all.xml
+  - https://www.sec.gov/news/pressreleases.rss
+  - https://feeds.bbci.co.uk/news/business/rss.xml
+  - https://www.coindesk.com/arc/outboundfeeds/rss/

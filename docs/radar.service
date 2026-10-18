@@ -1,0 +1,17 @@
+[Unit]
+Description=Radar de Investimentos — pesquisa e entrega diária pelo Telegram
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/radar
+EnvironmentFile=/opt/radar/.env
+ExecStart=/opt/radar/.venv/bin/radar schedule
+Restart=on-failure
+RestartSec=30
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

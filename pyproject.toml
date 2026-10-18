@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radar-investimentos"
+version = "1.0.0"
+description = "Pesquisa de investimentos com fontes, histórico e entrega pelo Telegram"
+requires-python = ">=3.12"
+dependencies = [
+  "openai>=2,<3", "httpx>=0.28,<1", "pydantic>=2.10,<3",
+  "pandas>=2.2,<3", "numpy>=2,<3", "PyYAML>=6,<7", "reportlab>=4.2,<5",
+  "Jinja2>=3.1,<4", "python-dotenv>=1,<2", "APScheduler>=3.11,<4",
+  "yfinance>=0.2.66,<1", "exchange-calendars>=4.11,<5",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "pypdf>=5,<7"]
+
+[project.scripts]
+radar = "radar.cli:main"
+
+[tool.setuptools.package-data]
+radar = ["templates/*.j2"]
+
+[tool.setuptools.packages.find]
+include = ["radar*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

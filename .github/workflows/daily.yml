@@ -1,0 +1,107 @@
+name: Radar diário
+
+on:
+  schedule:
+    # 19h30 e 20h30 America/Sao_Paulo (UTC-3). Guarda de fuso no job.
+    - cron: '30 22 * * *'
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'prepare pesquisa; deliver envia o relatório pronto ou pesquisa se necessário'
+        type: choice
+        default: prepare
+        options: [prepare, deliver]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: radar-diario
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+      OPENAI_MODEL: gpt-4.1-mini
+      DAILY_BUDGET_USD: '3.00'
+      RADAR_TIMEZONE: America/Sao_Paulo
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - name: Dependências
+        run: |
+          pip install --require-hashes -r requirements.lock
+          pip install --no-deps -e .
+      - name: Restaurar histórico (falhar se não for possível consultar o estado)
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          artifact_id=$(gh api "repos/$REPO/actions/artifacts?name=radar-state&per_page=20" --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | reverse | .[0].id // empty')
+          if [ -n "$artifact_id" ]; then
+            gh api "repos/$REPO/actions/artifacts/$artifact_id/zip" > /tmp/radar-state.zip
+            python -m zipfile -e /tmp/radar-state.zip .
+          fi
+      - name: Validar configuração sem imprimir valores
+        run: |
+          python - <<'PY'
+          import os
+          missing = [k for k in ('TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','OPENAI_API_KEY') if not os.getenv(k)]
+          if missing:
+              raise SystemExit('Secrets ausentes: ' + ', '.join(missing))
+          PY
+      - name: Testes
+        run: python -m pytest -q
+      - name: Preparar ou entregar
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_MODE: ${{ inputs.mode }}
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from radar.config import Settings
+          from radar.pipeline import run
+          event = os.getenv('EVENT_NAME')
+          now = datetime.now(ZoneInfo('America/Sao_Paulo'))
+          deliver = (os.getenv('MANUAL_MODE') == 'deliver') if event == 'workflow_dispatch' else os.getenv('EVENT_SCHEDULE') == '30 23 * * *'
+          if deliver and event == 'schedule' and now.hour < 20:
+              raise SystemExit('Fuso/cron incompatível: não entregar antes de 20h30 de Brasília')
+          run(Settings.from_env(), send=deliver)
+          PY
+      - name: Alerta de falha do workflow
+        if: failure()
+        run: |
+          python - <<'PY'
+          from radar.config import Settings
+          from radar.storage import Store
+          from radar.telegram import Telegram
+          s = Settings.from_env()
+          if s.telegram_token.get_secret_value() and s.telegram_chat.get_secret_value():
+              Telegram(s, Store(s.data_dir/'radar.sqlite3')).alert(s.now().date().isoformat(), 'Falha no workflow diário. Verificar GitHub Actions; o relatório pode não ter sido entregue integralmente.')
+          PY
+      - name: Salvar histórico e relatório, inclusive em falha de pesquisa
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: radar-state
+          path: |
+            data/
+            reports/
+          retention-days: 90
+          if-no-files-found: warn

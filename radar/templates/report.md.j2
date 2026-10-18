@@ -1,0 +1,167 @@
+# RADAR DE INVESTIMENTOS — {{ r.day }}
+
+{% if r.demo %}DEMONSTRAÇÃO — DADOS SINTÉTICOS. NÃO USAR PARA DECISÕES.
+
+{% endif %}Status: {{ r.status|upper }}. Gerado em {{ r.generated_at }}. Fuso de entrega: America/Sao_Paulo.
+
+## 1. RESUMO EXECUTIVO
+
+{{ r.research.summary }}
+
+Cobertura: {{ r.assets|length }} ativos analisados/coletados. {{ r.limitations|length }} limitações registradas; lista completa na seção 16 e detalhes em cada ativo. Recomendações sem cobertura suficiente permanecem em AGUARDAR.
+
+## 2. PANORAMA MACROECONÔMICO
+
+{% for summary in r.research.summaries %}{{ summary }}
+
+{% endfor %}## 3. NOTÍCIAS DO DIA E IMPACTOS
+
+{% for n in r.research.news %}## {{ n.title }}
+
+FATO: {{ n.evidence.fact }}
+Data/hora da publicação: {{ n.evidence.published_at }}
+Fonte: {{ n.evidence.source_url }}
+INTERPRETAÇÃO: {{ n.interpretation }}
+Potenciais beneficiados: {{ n.winners|join(', ') }}
+Potenciais prejudicados: {{ n.losers|join(', ') }}
+Horizonte: {{ n.horizon }}
+HIPÓTESE ALTERNATIVA: {{ n.alternative }}
+Consequência prática: {{ n.practical }}
+
+{% else %}Não há notícias recentes confirmadas pela pesquisa disponível. Isso não comprova ausência de eventos.
+
+{% endfor %}## 4. BOLSAS, JUROS, MOEDAS E COMMODITIES
+
+{% for m in r.macro %}{{ m.name }}: {{ m.get('price')|fmt }} {{ m.get('currency', '') }}. Último dado: {{ m.get('as_of', 'não disponível') }}. Variação entre últimos candles: {{ m.get('change_last_session')|fmt }} (fração). Fonte: {{ m.get('source', 'indisponível') }}. {{ m.get('error', '') }}
+
+{% endfor %}## 5–6. RANKINGS DE AÇÕES AMERICANAS E ETFs
+
+{% for category in ['stocks','us_etfs','br_etfs','crypto'] %}## {{ category }}
+
+{% for a in r.assets|selectattr('category','equalto',category)|sort(attribute='ranking.score',reverse=true) %}{{ a.symbol }} — {{ a.ranking.decision }}. Pontos {{ a.ranking.score }}/100; cobertura {{ (a.ranking.coverage*100)|round(1) }}%. {{ 'WATCHLIST' if a.watchlist else 'DESCOBERTA' }}.
+{{ a.ranking.blockers|join('; ') or 'Critérios calculados conforme metodologia; consultar riscos individuais.' }}
+
+{% endfor %}{% endfor %}## 7. ETFs PRIORITÁRIOS E COMPARAÇÃO DE RETORNO TOTAL
+
+{{ r.etf_comparison|fmt }}
+
+Sobreposição: as posições atuais de cada ETF constam nas análises individuais; posições de datas distintas não demonstram sobreposição completa da carteira. Retorno passado não estabelece superioridade futura. Taxas e estratégias precisam ser confirmadas nas gestoras.
+
+## 8–9. ANÁLISE INDIVIDUAL DE TODOS OS ATIVOS E CRIPTOMOEDAS
+
+{% for a in r.assets %}## {{ a.symbol }} — {{ a.get('name', a.symbol) }}
+
+Grupo: {{ a.category }}. {{ 'Watchlist obrigatória' if a.watchlist else 'Novo candidato: ' ~ a.get('screen','') }}.
+DECISÃO: {{ a.ranking.decision }}. Pontuação {{ a.ranking.score }}/100. Cobertura {{ (a.ranking.coverage*100)|round(1) }}%.
+
+{% if a.get('quote') %}Preço: {{ a.quote.price|fmt }} {{ a.quote.currency }} por unidade. Horário UTC: {{ a.quote.as_of }}. Coletado em {{ a.retrieved_at }}.
+Fonte: {{ a.quote.source }}
+Mercado e atualidade: {{ a.get('market',{})|fmt }}
+
+{% else %}COTAÇÃO INDISPONÍVEL — não há base para entrada ou comparação de preço.
+
+{% endif %}Falhas e lacunas: {{ a.get('errors',[])|join('; ') or 'ver campos não disponíveis e limitações da pesquisa' }}.
+
+{% if a.get('thesis') %}VALUATION — {{ a.thesis.valuation_context }}
+
+FUNDAMENTOS — {{ a.thesis.fundamentals }}
+
+TÉCNICO — {{ a.thesis.technical_interpretation }}
+
+CATALISADORES — {{ a.thesis.catalysts|join('; ') }}
+
+RISCOS — {{ a.thesis.risks|join('; ') }}
+
+CONDIÇÃO DE ESPERA — {{ a.thesis.wait_condition }}
+
+Horizonte: {{ a.thesis.horizon }}. Convicção: {{ a.thesis.conviction }}. Justificativa: {{ a.thesis.conviction_reason }}.
+
+FATOS E FONTES:
+{% for fact in a.thesis.facts %}- {{ fact.fact }} ({{ fact.published_at }}). {{ fact.source_url }}
+{% endfor %}
+
+LACUNAS DA PESQUISA — {{ a.thesis.missing|join('; ') or 'Nenhuma lacuna declarada pelo pesquisador; conferir cobertura objetiva abaixo.' }}
+
+{% else %}PESQUISA NÃO CONCLUÍDA PARA ESTE ATIVO. Aguardar; métricas isoladas não substituem investigação.
+
+{% endif %}{% if a.category == 'crypto' %}CRIPTO — métricas verificadas e dados ainda ausentes:
+{{ a.get('crypto',{})|fmt }}
+
+Cripto opera 24/7, com liquidez e estrutura distintas das bolsas. Desbloqueios, emissão, concentração e segurança exigem fontes específicas. Ausência de dados não comprova segurança.
+
+{% endif %}{% if a.get('holdings') %}COMPOSIÇÃO ETF — {{ a.holdings|fmt }}
+
+{% endif %}## 10. FUNDAMENTOS — {{ a.symbol }}
+
+Fonte, período e unidades: {{ a.get('fundamentals_source',{})|fmt }}
+
+{{ a.get('fundamentals',{})|metric_table }}
+
+Múltiplos históricos, pares, revisões de estimativas, guidance e calendário de vencimentos não são inferidos quando ausentes. Dívida corrente é apenas proxy de vencimentos de até 12 meses. ROIC aproximado está identificado na metodologia do campo. Frações (0,10) representam 10%; múltiplos são vezes.
+
+## 11. INDICADORES TÉCNICOS — {{ a.symbol }}
+
+{{ a.get('technical',{})|metric_table }}
+
+Retornos por número de candles, sem confundir dias corridos: {{ a.get('returns',{})|fmt }}
+
+## 12. VALUATION E CENÁRIOS — {{ a.symbol }}
+
+{{ a.get('valuation',{'available':false,'reason':'DCF de ações não é aplicado mecanicamente a ETF/cripto'})|fmt }}
+
+Armadilhas de valor: {{ a.get('value_traps',[])|join('; ') or 'Nenhuma flag objetiva disponível; isso não demonstra ausência de riscos.' }}
+
+## 13. PONTUAÇÃO E JUSTIFICATIVA — {{ a.symbol }}
+
+{{ a.ranking.method }}
+
+{% for criterion,component in a.ranking.components.items() %}{{ criterion }}: {{ component.score }}. Peso: {{ a.ranking.weights.get(criterion,0) }}. Tipo: {{ component.type }}.
+Justificativa: {{ component.reason }}
+Fontes adicionais: {{ component.get('sources',[])|join(', ') }}
+
+{% endfor %}Critérios sem pontuação: {% for key in a.ranking.weights if key not in a.ranking.components %}{{ key }}; {% endfor %}
+
+Impedimentos: {{ a.ranking.blockers|join('; ') or 'Nenhum impedimento automático; julgamento e riscos continuam necessários.' }}
+
+{% endfor %}## 14. AGENDA DOS PRÓXIMOS SETE DIAS
+
+{% for e in r.research.events %}{{ e.published_at }} — {{ e.fact }}
+{{ e.source_url }}
+
+{% else %}Agenda não verificada nesta execução. Consultar calendários oficiais antes de agir.
+
+{% endfor %}## 15. MUDANÇAS DESDE O RELATÓRIO ANTERIOR
+
+{{ r.comparison_note }}
+
+{% for c in r.changes %}{{ c.symbol }}: {{ c.before }} → {{ c.after }}. Preço anterior: {{ c.previous_price|fmt }}; atual {{ c.current_price|fmt }}; variação {{ c.price_change|fmt }} (fração). Delta da pontuação: {{ c.score_change|fmt }}. Novos fatos: {{ c.new_facts|join('; ') }}.
+
+{% endfor %}## 16. METODOLOGIA, COBERTURA, CUSTOS E FONTES
+
+Triagem: {{ r.discovery|fmt }}
+
+LIMITAÇÕES OPERACIONAIS:
+{% for limitation in r.limitations %}- {{ limitation }}
+{% endfor %}
+
+Cobertura: todos os ativos da watchlist constam no relatório mesmo quando os dados falham. A triagem pública é uma amostra de screeners do provedor; não examina todo o mercado. Os candidatos são investigação, sem promessa de compra.
+
+Score ausente não é nota neutra; peso ausente permanece descoberto. Pesquisa com IA pode errar; as evidências e julgamentos qualitativos estão separados de cálculos reproduzíveis. Valuation não é sinal infalível. Modelos não executam ordens.
+
+Tokens e ferramentas: {{ r.cost|fmt }}. Valores em USD estimados pelas tarifas configuradas, sem impostos; confira o faturamento oficial. Reservas de chamadas incertas permanecem comprometidas.
+
+Limitações da pesquisa: {{ r.research.limitations|join('; ') }}
+
+Notícias coletadas diretamente (manchetes não são, por si só, análise de impacto):
+{% for n in r.headlines %}{{ n.published_at }} — {{ n.title }}
+{{ n.url }}
+
+{% endfor %}Fontes utilizadas/retornadas pela pesquisa:
+{% for url in r.research.sources %}{{ url }}
+
+{% endfor %}Documentação da implementação:
+https://developers.openai.com/api/docs/guides/tools-web-search
+https://developers.openai.com/api/docs/pricing
+https://core.telegram.org/bots/api
+
+As credenciais e o identificador privado do chat não fazem parte deste relatório.
