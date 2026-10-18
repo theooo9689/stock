@@ -74,6 +74,7 @@ def test_manual_report_does_not_block_scheduled_delivery(tmp_path):
     settings=Settings(telegram_token='test',telegram_chat='private')
     telegram=Telegram(settings,Store(tmp_path/'state.db'),httpx.Client(transport=httpx.MockTransport(handle)))
     report=demo_report(settings)
+    report["demo"]=False  # mock transport; synthetic data never reaches the network
     pdf=tmp_path/'demo.pdf';pdf.write_bytes(b'%PDF synthetic')
     data=tmp_path/'demo.json';data.write_text('{}')
     paths={'pdf':pdf,'json':data}
@@ -113,9 +114,9 @@ def test_pdf_full_content_and_demo_all_watchlist(tmp_path):
     text=''.join(p.extract_text() for p in pdf.pages)
     assert len(pdf.pages)>5
     assert 'DEMONSTRAÇÃO' in text
-    assert 'EME' in text and 'HYPE' in text and 'AVDV' in text
-    assert 'Métrica' in text
-    assert 'As credenciais' in text
+    assert 'EME' in text and 'AVDV' in text and 'HYPE' not in text
+    assert 'Watchlist' in text
+    assert 'Metodologia, lacunas e fontes' in text
     assert 'private' not in text
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 import httpx
 
@@ -47,7 +47,13 @@ class HTTP:
             return cached
         for attempt in range(3):
             try:
-                r = self.client.get(url, params=params)
+                target, query = url, params
+                for redirect in range(4):
+                    r = self.client.get(target, params=query)
+                    if r.status_code not in (301,302,303,307,308):break
+                    destination=urljoin(str(r.url),r.headers.get('Location',''))
+                    if not safe_url(destination) or redirect==3:raise APIError('Redirecionamento de fonte recusado')
+                    target,query=destination,None
             except httpx.TransportError:
                 if attempt == 2:
                     raise APIError("Falha de transporte no provedor") from None

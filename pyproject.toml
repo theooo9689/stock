@@ -14,6 +14,7 @@ dependencies = [
   "yfinance>=0.2.66,<1", "exchange-calendars>=4.11,<5",
   "beautifulsoup4>=4.12,<5",
   "portalocker>=3,<4", "tzdata>=2025.2",
+  "psutil>=6,<8",
 ]
 
 [project.optional-dependencies]

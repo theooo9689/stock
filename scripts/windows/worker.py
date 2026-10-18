@@ -26,6 +26,18 @@ def main():
     from radar.storage import Store
     from radar.telegram import Telegram
 
+    # Ollama must also be available after a fresh Windows login.
+    import subprocess
+    import urllib.request
+    try:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:11434/api/tags', timeout=2):
+            pass
+    except Exception:
+        executable = Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Ollama' / 'ollama.exe'
+        if executable.is_file():
+            subprocess.Popen([str(executable), 'serve'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+
     def once():
         settings = None
         try:

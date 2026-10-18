@@ -35,5 +35,5 @@ def test_technical_good_signal_does_not_override_missing_valuation():
            'valuation':{'available':False}}
     thesis={'facts':[{'fact':'verified'}],'assessments':[{'criterion':'macro','score':100,'reason':'context','sources':['https://example.com']}], 'missing':[]}
     ranking=score_asset(asset,wl.weights,thesis)
-    assert ranking['decision']=='AGUARDAR'
-    assert 'Valor justo não sustentado pelos dados' in ranking['blockers']
+    assert ranking['decision']=='ANÁLISE INCONCLUSIVA — DADOS INSUFICIENTES'
+    assert any('cobertura objetiva insuficiente' in b for b in ranking['blockers'])

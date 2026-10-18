@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $SourceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $AppRoot = Join-Path $env:LOCALAPPDATA 'RadarInvestimentos'
 $Identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
@@ -94,8 +94,10 @@ try {
         Copy-Item -LiteralPath '.env.example' -Destination '.env'
         Start-Process notepad.exe -ArgumentList ('"' + (Join-Path $AppRoot '.env') + '"') -Wait
     }
-    & $VenvPython -c "from radar.config import Settings,Watchlist; s=Settings.from_env(); Watchlist.load(s.config_path); missing=[n for n,v in (('TELEGRAM_BOT_TOKEN',s.telegram_token),('TELEGRAM_CHAT_ID',s.telegram_chat),('OPENAI_API_KEY',s.openai_key)) if not v.get_secret_value()]; assert not missing, 'Configuracao incompleta: '+', '.join(missing); import radar.scheduler"
+    & $VenvPython -c "from radar.config import Settings,Watchlist; s=Settings.from_env(); Watchlist.load(s.config_path); missing=[n for n,v in (('TELEGRAM_BOT_TOKEN',s.telegram_token),('TELEGRAM_CHAT_ID',s.telegram_chat)) if not v.get_secret_value()]; assert not missing, 'Configuracao incompleta: '+', '.join(missing); import radar.scheduler"
     if ($LASTEXITCODE -ne 0) { throw 'Configuracao incompleta. Preencha o arquivo .env na pasta do radar e execute novamente.' }
+
+    & (Join-Path $AppRoot 'scripts\windows\setup-ollama.ps1')
 
     $Worker = Join-Path $AppRoot 'scripts\windows\worker.py'
     $PythonW = Join-Path $AppRoot '.venv\Scripts\pythonw.exe'
@@ -105,7 +107,7 @@ try {
         $AtLogin = New-ScheduledTaskTrigger -AtLogOn -User $Identity.Name
         $NextMinute = (Get-Date).Date.AddHours((Get-Date).Hour).AddMinutes((Get-Date).Minute + 1)
         $EveryMinute = New-ScheduledTaskTrigger -Once -At $NextMinute -RepetitionInterval (New-TimeSpan -Minutes 1)
-        $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+        $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 8)
         $Principal = New-ScheduledTaskPrincipal -UserId $Identity.User.Value -LogonType Interactive -RunLevel Limited
         Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger @($AtLogin,$EveryMinute) -Settings $Settings -Principal $Principal -Description 'Radar local: pesquisa 19h30, envio 20h30 de Brasilia; retoma o dia ao entrar no Windows.' -Force | Out-Null
         if (Test-Path -LiteralPath $StartupLink) { Remove-Item -LiteralPath $StartupLink }

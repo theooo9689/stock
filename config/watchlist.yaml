@@ -1,3 +1,5 @@
+priority: [AVUV, AVDV, JEPI, JEPQ, SCHD, IVVB11, VOO, IVV, SPY, QQQ, WRLD11, EME, FIS, ORCL, CRWV, AAOI, AMKR, NBIS, VRT, BTC, ETH, SOL, BNB, XRP, LINK]
+publication: {stocks: 5, etfs: 3, crypto: 3, observe: 5}
 assets:
   us_etfs: [AVUV, AVDV, JEPI, JEPQ, SCHD, VOO, IVV, SPY, QQQ, XLE]
   br_etfs: [IVVB11, WRLD11, HASH11, GOLD11, BOVA11, NASD11, DIVO11]
@@ -17,7 +19,7 @@ market_symbols:
 discovery:
   enabled: true
   max_candidates: 15
-  crypto_candidates: 3
+  crypto_candidates: 0
   min_market_cap: 1000000000
   min_dollar_volume: 10000000
   screeners: [undervalued_growth_stocks, undervalued_large_caps, growth_technology_stocks, most_actives, top_etfs]
@@ -36,3 +38,5 @@ news_feeds:
   - https://www.sec.gov/news/pressreleases.rss
   - https://feeds.bbci.co.uk/news/business/rss.xml
   - https://www.coindesk.com/arc/outboundfeeds/rss/
+  - https://finance.yahoo.com/news/rssindex
+  - https://feeds.bbci.co.uk/news/world/rss.xml

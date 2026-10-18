@@ -1,0 +1,47 @@
+# Radar de Investimentos — {{ r.day }}
+{% if r.demo %}DEMONSTRAÇÃO: DADOS FICTÍCIOS; NÃO USAR PARA DECISÕES.{% endif %}
+
+Status: {{ r.status }} • metodologia {{ r.methodology_version }} • snapshot {{ r.snapshot_id }}
+
+## Resumo executivo
+{{ r.research.summary }}
+
+## Notícias verificadas e consequências
+{% for n in r.research.news if n.get('verification',{}).get('review',{}).get('approved') %}
+### {{ n.title }}
+{{ n.evidence.fact }}
+{{ n.evidence.published_at }} • {{ n.evidence.source_url }}
+Contexto: {{ n.get('prior_context','') }}
+Mecanismo: {{ n.interpretation }}
+Observado: {{ n.get('observed_effect','não confirmado') }}
+Hipóteses: {{ n.get('positive_scenario','') }} / {{ n.get('negative_scenario','') }}
+Monitorar: {{ n.get('monitor','') }}
+{% else %}Nenhuma interpretação de notícia passou por toda a verificação nesta edição; isso não comprova ausência de notícias.{% endfor %}
+
+## Teses selecionadas
+{% for a in r.assets if a.symbol in r.publication.selected %}
+### {{ a.symbol }} — {{ a.get('name',a.symbol) }}
+{% for key,text in a.thesis.premium.items() if key in ['business','why_now','counter_thesis','technical_context','buy_now','do_not_buy','entry_condition','invalidation','horizon'] %}
+{{ key }}: {{ text }}
+{% endfor %}
+{% for interpretation in a.thesis.premium.interpretations %}
+{{ interpretation.metric_id }}: {{ a.thesis.premium.metrics[interpretation.metric_id].value|fmt }} — {{ interpretation.interpretation }}
+Fonte: {{ a.thesis.premium.metrics[interpretation.metric_id].source }}
+{% endfor %}
+{% for e in a.thesis.premium.evidence %}
+{{ e.source }} • {{ e.get('published_at','não informado') }} • {{ e.quote }}
+{% endfor %}
+{% else %}Nenhuma compra publicada sem dados, tese e revisão aprovadas.{% endfor %}
+
+## Observação
+{% for a in r.publication.observe %}{{ a.symbol }} — {{ a.condition }}
+{% endfor %}
+## Watchlist prioritária
+{% for a in r.assets if a.symbol in r.publication.watchlist %}{{ a.symbol }} • {{ a.get('quote',{}).get('price','N/D') }} {{ a.get('quote',{}).get('currency','') }} • {{ a.get('quote',{}).get('as_of','') }} • {{ a.ranking.decision }}
+{% endfor %}
+
+## Limitações e auditoria
+{{ r.get('ai',{})|fmt }}
+{% for limitation in r.limitations %}- {{ limitation }}
+{% endfor %}
+Dados completos de triagem, fontes, timestamps e parâmetros ficam no JSON e no snapshot, não como tabelas repetitivas no relatório.

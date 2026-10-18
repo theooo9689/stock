@@ -35,7 +35,7 @@ def derive(info, statements=None):
     out["dividend_yield"] = number(info.get("trailingAnnualDividendYield"))
     if out["dividend_yield"] is None and number(info.get("dividendYield")) is not None:
         out["dividend_yield"] = float(info["dividendYield"]) / 100
-    out.update({k: number(v) for k, v in s.items()})
+    out.update({k: number(v) for k, v in s.items() if k != "annual_history"})
     out["price_fcf"] = ratio(out["market_cap"], out["fcf"])
     out["fcf_yield"] = ratio(out["fcf"], out["market_cap"])
     out["net_debt_ebitda"] = ratio(out["debt"] - out["cash"], out["ebitda"]) if out["debt"] is not None and out["cash"] is not None else None

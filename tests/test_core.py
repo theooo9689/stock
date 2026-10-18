@@ -141,9 +141,9 @@ def test_invalid_source_urls(url):
 def test_no_buy_without_fundamentals_and_research():
     wl = Watchlist.load('config/watchlist.yaml')
     r = score_asset({'category':'stocks','technical':{'sma200':100,'rsi14':20,'macd_histogram':1},'quote':{'price':101},'market':{'stale':False}},wl.weights)
-    assert r['decision'] == 'AGUARDAR'
-    assert r['coverage'] == .1
-    assert r['score'] < 10
+    assert r['decision'] == 'ANÁLISE INCONCLUSIVA — DADOS INSUFICIENTES'
+    assert r['coverage'] < .2
+    assert r['score'] is None
     assert len(r['blockers']) >= 3
 
 

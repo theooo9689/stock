@@ -46,7 +46,7 @@ def indicators(frame, crypto=False):
     result = {
         "rsi14": clean(rsi.iloc[-1]), "macd": clean(macd.iloc[-1]), "macd_signal": clean(signal.iloc[-1]),
         "macd_histogram": clean((macd-signal).iloc[-1]), "atr14": clean(wilder(tr).iloc[-1]),
-        "sma20": sma[20], "sma50": s50, "sma200": s200,
+        "sma20": sma[20], "ema20": clean(close.ewm(span=20, adjust=False, min_periods=20).mean().iloc[-1]), "sma50": s50, "sma200": s200,
         "relative_volume": clean(vol.iloc[-1] / vol.iloc[-21:-1].mean()) if vol.iloc[-21:-1].mean() else None,
         "annualized_volatility": clean(close.pct_change().tail(60).std() * math.sqrt(days)),
         "high52w": clean(high.tail(days).max()), "low52w": clean(low.tail(days).min()),

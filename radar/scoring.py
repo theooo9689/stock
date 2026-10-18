@@ -1,6 +1,55 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from .fundamentals import number
+from .http import safe_url
+
+METHODOLOGY = "premium-2.0"
+INCONCLUSIVE = "ANÁLISE INCONCLUSIVA — DADOS INSUFICIENTES"
+
+
+def recent_period(period, as_of, max_days=550):
+    try:
+        age=(datetime.fromisoformat(as_of.replace("Z","+00:00")).date()-datetime.fromisoformat(period).date()).days
+        return 0 <= age <= max_days
+    except (TypeError,ValueError,AttributeError):return False
+
+
+def data_quality(a):
+    m, t, q = (a.get(k, {}) for k in ("fundamentals", "technical", "quote"))
+    source = a.get("fundamentals_source", {})
+    checks = {
+        "cotação com fonte, moeda e horário": bool(q.get("price") and q.get("as_of") and q.get("currency") and safe_url(q.get("source", ""))),
+        "cotação atual para a sessão": bool(q) and not a.get("market", {}).get("stale", True),
+        "histórico técnico suficiente": all(t.get(k) is not None for k in ("rsi14", "macd", "sma50", "sma200", "atr14")),
+        "liquidez mensurada": (a.get("average_dollar_volume") or 0) >= 10_000_000,
+    }
+    critical = []
+    if a["category"] == "stocks":
+        for key in ("pe", "ev_ebitda", "fcf_yield", "revenue_growth", "operating_margin", "net_debt_ebitda"):
+            checks[key] = m.get(key) is not None
+        checks["fonte dos demonstrativos"] = safe_url(source.get("url", "")) and recent_period(source.get("period"),q.get("as_of"))
+        critical = ["fonte dos demonstrativos", "fcf_yield", "net_debt_ebitda"]
+    elif a["category"] in ("us_etfs", "br_etfs"):
+        checks.update({"custos": m.get("expense_ratio") is not None,
+                       "composição datada": bool(a.get("holdings", {}).get("top")) and bool(a.get("holdings", {}).get("period")),
+                       "estratégia documentada": bool(a.get("etf_profile", {}).get("source")),
+                       "patrimônio": m.get("fund_assets") is not None})
+        critical = ["custos", "composição datada", "estratégia documentada"]
+    else:
+        c = a.get("crypto", {})
+        for key in ("market_cap", "fully_diluted_valuation", "circulating_supply", "total_volume"):
+            checks[key] = c.get(key) is not None
+        # FDV and a language-model score do not verify unlocks, security or adoption.
+        for key in ("tokenomics_verified", "adoption_verified", "security_verified"):
+            proof = c.get(key, {})
+            checks[key] = isinstance(proof, dict) and proof.get("checked") is True and safe_url(proof.get("source", "")) and bool(proof.get("as_of")) and bool(proof.get("quote"))
+        critical = ["tokenomics_verified", "adoption_verified", "security_verified"]
+    critical = ["cotação com fonte, moeda e horário", "cotação atual para a sessão"] + critical
+    missing = [k for k, ok in checks.items() if not ok]
+    return {"coverage": sum(bool(v) for v in checks.values()) / len(checks), "checks": checks, "missing": missing,
+            "critical_missing": [k for k in critical if not checks[k]], "method": "Completude de requisitos do tipo de ativo; não mede atratividade."}
 
 
 def clamp(x):
@@ -48,31 +97,35 @@ def score_asset(asset, weights, thesis=None):
             put("liquidity", min(100, volume / cap * 1000), "Volume 24h/market cap ×1000; volume reportado pode conter distorções")
         if cap and fdv and fdv > 0:
             put("tokenomics", cap / fdv * 100, "Market cap/FDV ×100; não substitui auditoria de desbloqueios e concentração")
-    if thesis:
-        for a in thesis.get("assessments", []):
-            if a["criterion"] in weights[kind] and a["criterion"] not in parts and a.get("sources"):
-                parts[a["criterion"]] = {"score": a["score"], "reason": a["reason"], "sources": a["sources"], "type": "julgamento qualitativo da pesquisa"}
     w = weights[kind]
-    coverage = sum(w[k] for k in parts if k in w)
-    score = sum(parts[k]["score"] * w[k] for k in parts if k in w)  # missing is zero, never renormalized
-    blockers = []
-    if coverage < 0.85:
-        blockers.append(f"Cobertura de critérios de apenas {coverage:.0%}")
-    if not q or asset.get("market", {}).get("stale", True):
-        blockers.append("Cotação ausente/desatualizada ou calendário não validado")
-    if not thesis or not thesis.get("facts"):
-        blockers.append("Pesquisa com fontes ainda insuficiente")
-    if kind == "stocks" and not v.get("available"):
-        blockers.append("Valor justo não sustentado pelos dados")
-    if kind == "crypto" and (not thesis or thesis.get("missing")):
-        blockers.append("Lacunas na investigação de cripto")
-    traps = asset.get("value_traps", [])
-    if len(traps) >= 2:
-        blockers.append("Possível armadilha de valor: " + "; ".join(traps))
-    decision = "AGUARDAR"
-    if coverage >= 0.85 and score < 35 and q and thesis:
-        decision = "EVITAR"
-    if score >= 72 and not blockers and (kind != "stocks" or q["price"] <= v.get("entry_max", 0)):
-        decision = "COMPRAR PARCIALMENTE"
-    return {"decision": decision, "score": round(score, 2), "coverage": round(coverage, 3), "components": parts,
-            "weights": w, "blockers": blockers, "method": "Soma ponderada sem reescalar dados ausentes. Compra exige >=72, cobertura >=85%, cotação válida e fontes; ações também margem de segurança. Evitar <35 com cobertura >=85%. Não são probabilidades de retorno."}
+    quality = data_quality(asset)
+    component_coverage = sum(w[k] for k in parts if k in w)
+    sufficient = quality["coverage"] >= .8 and not quality["critical_missing"] and component_coverage >= .6
+    score = 5 * round(sum(parts[k]["score"] * w[k] for k in parts if k in w) / component_coverage / 5) if sufficient else None
+    premium = (thesis or {}).get("premium", {})
+    evidence_ok = bool(premium.get("validated") and premium.get("review", {}).get("approved"))
+    blockers = list(quality["critical_missing"])
+    if not sufficient:
+        blockers.append("Avaliação indisponível: cobertura objetiva insuficiente")
+    if not evidence_ok:
+        blockers.append("Tese aprofundada e revisão com evidências ainda não aprovadas")
+    decision = INCONCLUSIVE
+    if sufficient and evidence_ok:
+        decision = "AGUARDAR"
+        if score < 35:
+            decision = "EVITAR"
+        if score >= 75 and (kind != "stocks" or (v.get("available") and q["price"] <= v.get("entry_max", 0))) and not asset.get("value_traps"):
+            decision = "COMPRAR PARCIALMENTE"
+    for key, part in parts.items():
+        part["inputs_source"] = asset.get("quote", {}).get("source") if key == "technical" else source_for(asset, kind)
+    return {"decision": decision, "score": score, "coverage": round(quality["coverage"], 3), "data_quality": quality,
+            "attractiveness": {"score": score, "available_weight": component_coverage, "missing_is_zero": False},
+            "confidence": {"level": "média" if evidence_ok and sufficient else "baixa", "reason": "Evidências e revisão aprovadas" if evidence_ok else "Conclusão não sustentada por investigação aprovada"},
+            "components": parts, "weights": w, "blockers": blockers, "methodology_version": METHODOLOGY,
+            "method": "Qualidade dos dados separada de atratividade e confiança. Score indisponível se cobertura insuficiente; sem notas da IA. Soma normalizada dos critérios observados, arredondada a 5 pontos, sem falsa precisão."}
+
+
+def source_for(asset, kind):
+    if kind == "crypto":
+        return asset.get("crypto", {}).get("source")
+    return asset.get("fundamentals_source", {}).get("url")

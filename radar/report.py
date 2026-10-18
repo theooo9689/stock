@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -36,30 +37,11 @@ def metric_table(mapping):
 
 
 def summaries(report):
-    assets = report["assets"]
-    buys = sorted([a for a in assets if a["ranking"]["decision"] == "COMPRAR PARCIALMENTE"], key=lambda a: -a["ranking"]["score"])
-    wait = sorted([a for a in assets if a["ranking"]["decision"] == "AGUARDAR"], key=lambda a: -a["ranking"]["score"])
-    news = report["research"]["news"]
-    lines = [f"RADAR DE INVESTIMENTOS — {report['day']}", f"Status: {report['status'].upper()}", "", "O QUE ACONTECEU HOJE"]
-    lines += [f"• {n['title']} — {n['interpretation']}\n{n['evidence']['source_url']}" for n in news[:5]] or ["Sem notícia relevante confirmada pela pesquisa disponível."]
-    lines += ["", "OPORTUNIDADES"]
-    lines += [f"• {a['symbol']}: compra parcial; {a.get('thesis', {}).get('valuation_context', 'ver cenário e riscos no PDF')}" for a in buys[:3]] or ["Nenhuma compra atingiu os critérios com dados suficientes."]
-    if not buys:
-        lines += [f"• Investigar {a['symbol']}: {a.get('thesis', {}).get('wait_condition', 'aguardar dados e confirmação')}" for a in wait[:3]]
-    lines += ["", "MELHOR ESPERAR"]
-    lines += [f"• {a['symbol']}: " + ("; ".join(a["ranking"]["blockers"]) or a.get("thesis", {}).get("wait_condition", "Preço/risco não atingiu os critérios")) for a in wait[:3]]
-    lines += ["", "RISCOS DO MOMENTO"] + ["• " + x for x in report["research"]["risks"][:3]]
-    lines += ["", "O QUE MUDOU DESDE O RELATÓRIO ANTERIOR"] + ([f"• {d['symbol']}: {d['before']} → {d['after']}" for d in report["changes"][:8]] or [report["comparison_note"]])
-    lines += ["", "PRÓXIMOS EVENTOS"] + ([f"• {e['published_at']}: {e['fact']}\n{e['source_url']}" for e in report["research"]["events"][:5]] or ["Agenda não confirmada nas fontes disponíveis; consultar PDF."])
-    lines += ["", "Bolsas: conferir horário do último pregão no PDF. Cripto: negociação 24/7. Análise informativa, sem garantia de retorno."]
-    ranking = [f"RANKING — {report['day']}", "Pontuação: soma ponderada; lacunas reduzem cobertura e podem impedir compra."]
-    for name, categories in [("AÇÕES AMERICANAS", ("stocks",)), ("ETFs", ("us_etfs", "br_etfs")), ("CRIPTOMOEDAS", ("crypto",))]:
-        ranking.append("\n" + name)
-        for a in sorted([a for a in assets if a["category"] in categories], key=lambda a: -a["ranking"]["score"]):
-            r = a["ranking"]
-            reason = "; ".join(r["blockers"]) or a.get("thesis", {}).get("wait_condition", "Ver premissas e riscos no PDF")
-            ranking.append(f"{a['symbol']} — {r['decision']} ({r['score']:.1f}/100; cobertura {r['coverage']:.0%})\n{reason}")
-    return "\n".join(lines), "\n".join(ranking)
+    from .premium import upgrade_report
+    from .presentation import messages
+    if report.get('methodology_version') != 'premium-2.0':
+        report = upgrade_report(report)
+    return messages(report)
 
 
 def render_pdf(markdown, path):
@@ -123,17 +105,21 @@ def render_pdf(markdown, path):
 
 
 def generate(report, directory):
+    from .premium import upgrade_report
+    from .premium_pdf import render
+    from .presentation import preview
+    if report.get('methodology_version') != 'premium-2.0':
+        report = upgrade_report(report)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    prefix = "demonstracao-" if report.get("demo") else "radar-"
-    stem = prefix + report["day"]
-    env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"), undefined=StrictUndefined,
-                      autoescape=False, trim_blocks=True, lstrip_blocks=True)
-    env.filters["fmt"] = fmt
-    env.filters["metric_table"] = metric_table
-    text = env.get_template("report.md.j2").render(r=report)
-    md, pdf, data = [directory / (stem + ext) for ext in (".md", ".pdf", ".json")]
-    md.write_text(text, encoding="utf-8")
-    data.write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
-    render_pdf(text, pdf)
-    return {"markdown": md, "pdf": pdf, "json": data}
+    prefix = 'demonstracao-premium-' if report.get('demo') else 'radar-premium-'
+    output_hash=hashlib.sha256(json.dumps(report,sort_keys=True,ensure_ascii=False,allow_nan=False).encode()).hexdigest()[:8]
+    stem = prefix + report['day'] + '-' + report['snapshot_id'][:8]+'-'+output_hash
+    paths = {k:directory/(stem+ext) for k,ext in [('markdown','.md'),('pdf','.pdf'),('json','.json'),('telegram_preview','.html')]}
+    env = Environment(loader=FileSystemLoader(Path(__file__).parent/'templates'), undefined=StrictUndefined, autoescape=False)
+    env.filters['fmt'] = fmt
+    paths['markdown'].write_text(env.get_template('premium.md.j2').render(r=report), encoding='utf-8')
+    paths['json'].write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False), encoding='utf-8')
+    render(report, paths['pdf'])
+    preview(report, paths['telegram_preview'])
+    return paths

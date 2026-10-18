@@ -69,7 +69,7 @@ class Market:
         return frame, meta, url
 
     def statements(self, ticker):
-        cached = self.http.store.cached("fundamentals:" + ticker)
+        cached = self.http.store.cached("fundamentals:v2:" + ticker)
         if cached is not None:
             return cached
         t = yf.Ticker(ticker)
@@ -80,10 +80,21 @@ class Market:
         out = {}
         if ticker.endswith(".SA") or info.get("quoteType") == "ETF":
             result = {"info": info, "statements": out}
-            self.http.store.cache("fundamentals:" + ticker, result, 21600)
+            self.http.store.cache("fundamentals:v2:" + ticker, result, 21600)
             return result
         try:
             income, balance, cash = t.income_stmt, t.balance_sheet, t.cashflow
+            annual = []
+            for period in list(income.columns)[:5]:
+                annual.append({"period": str(period.date()), "revenue": number(income.loc["Total Revenue", period]) if "Total Revenue" in income.index else None,
+                               "eps": number(income.loc["Diluted EPS", period]) if "Diluted EPS" in income.index else None})
+            out["annual_history"] = annual
+            for metric in ("revenue", "eps"):
+                valid = [r for r in annual if r[metric] is not None]
+                if len(valid) >= 3 and valid[-1][metric] > 0 and valid[0][metric] > 0:
+                    years = (pd.Timestamp(valid[0]["period"]) - pd.Timestamp(valid[-1]["period"])).days / 365.25
+                    if years > 0:
+                        out[metric + "_cagr"] = (valid[0][metric] / valid[-1][metric]) ** (1 / years) - 1
 
             def latest(frame, keys):
                 for k in keys:
@@ -128,7 +139,7 @@ class Market:
         # Yahoo occasionally returns non-JSON native values. Normalize before persistence.
         import json
         result = json.loads(json.dumps(result, default=str))
-        self.http.store.cache("fundamentals:" + ticker, result, 21600 if info else 300)
+        self.http.store.cache("fundamentals:v2:" + ticker, result, 21600 if info else 300)
         return result
 
     def collect(self, asset):
@@ -148,7 +159,10 @@ class Market:
             }
             result["market"] = market_status(kind, result["quote"]["as_of"])
             result["technical"] = indicators(frame, crypto=kind == "crypto")
+            result["technical_as_of"] = frame.index[-1].isoformat()
             result["returns"] = returns(frame)
+            result["change_last_session"] = number(frame.close.iloc[-1] / frame.close.iloc[-2] - 1) if len(frame) > 1 else None
+            result["average_dollar_volume"] = number((frame.close * frame.volume).tail(20).mean())
             result["history"] = [{"date": str(i.date()), "adjusted_close": number(r.adjclose)} for i, r in frame.iterrows()]
             result["name"] = meta.get("longName", meta.get("shortName", symbol))
         except Exception as exc:
@@ -158,12 +172,14 @@ class Market:
                 data = self.statements(ticker)
                 info = data["info"]
                 result["fundamentals"] = derive(info, data["statements"])
+                result["financial_history"] = data["statements"].get("annual_history", [])
                 result["fundamentals_source"] = {"url": f"https://finance.yahoo.com/quote/{ticker}/financials/",
                                                    "retrieved_at": result["retrieved_at"], "period": data["statements"].get("financial_period"),
                                                    "currency": info.get("financialCurrency", info.get("currency")),
                                                    "units": "Ratios em fração/vezes; valores monetários na moeda dos demonstrativos; totalDebt inclui arrendamentos conforme provedor."}
                 result["sector"] = info.get("sector")
                 result["industry"] = info.get("industry")
+                result["business"] = {"description": info.get("longBusinessSummary"), "website": info.get("website"), "sector": info.get("sector"), "industry": info.get("industry")}
                 if kind == "stocks":
                     result["valuation"] = value_range(result["fundamentals"], self.watchlist.valuation)
                     if info.get("sector") in ("Financial Services", "Real Estate"):
@@ -187,7 +203,7 @@ class Market:
             funds = yf.Ticker(ticker).funds_data
             h = funds.top_holdings
             holdings = [{"symbol": str(i), "weight": number(r.get("Holding Percent"))} for i, r in h.iterrows()]
-            result = {"top": holdings, "sectors": funds.sector_weightings, "source": f"https://finance.yahoo.com/quote/{ticker}/holdings/", "as_of": datetime.now(timezone.utc).isoformat()}
+            result = {"top": holdings, "sectors": funds.sector_weightings, "source": f"https://finance.yahoo.com/quote/{ticker}/holdings/", "as_of": datetime.now(timezone.utc).isoformat(), "period": None, "date_note": "Data de coleta; data efetiva da composição não fornecida pelo endpoint."}
         except Exception:
             result = {"top": [], "sectors": {}, "missing": True}
         self.http.store.cache(key, result, 86400)
@@ -266,7 +282,9 @@ def compare_etfs(assets, fx_history):
     common = pd.DataFrame(series).dropna()
     if len(common) < 20:
         return {"available": False, "reason": "Período comum insuficiente"}
+    from .etf_research import compare_series, overlaps
     result = (common.iloc[-1] / common.iloc[0] - 1).to_dict()
     return {"available": True, "currency": "USD", "start": str(common.index[0]), "end": str(common.index[-1]),
-            "observations": len(common), "total_returns": result,
+            "observations": len(common), "total_returns": result, "risk":compare_series(common),
+            "overlaps": overlaps([a for a in assets if a["symbol"] in series]),
             "method": "Fechamentos ajustados Yahoo, mesmas datas, dividendos reinvestidos conforme ajustes do provedor; B3 convertido por USD/BRL nas mesmas datas. Taxas internas já refletidas nas cotas; impostos, corretagem e spread excluídos. Checar ajustes em eventos corporativos."}

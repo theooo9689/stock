@@ -16,6 +16,11 @@ class Settings(BaseModel):
     openai_key: SecretStr = SecretStr("")
     fmp_key: SecretStr = SecretStr("")
     model: str = "gpt-4.1-mini"
+    research_provider: str = "ollama"
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen3:8b"
+    ollama_context: int = Field(default=32768, ge=8192)
+    ollama_timeout: int = Field(default=600, ge=30, le=3600)
     reasoning_effort: str = "medium"
     budget: float = Field(default=3, gt=0)
     input_price: float = Field(default=0.4, ge=0)
@@ -60,6 +65,9 @@ class Settings(BaseModel):
             "max_output_tokens": "RESEARCH_MAX_OUTPUT_TOKENS", "max_tool_calls": "RESEARCH_MAX_TOOL_CALLS",
             "background": "RESEARCH_BACKGROUND", "data_dir": "RADAR_DATA_DIR",
             "reasoning_effort": "OPENAI_REASONING_EFFORT",
+            "research_provider": "RESEARCH_PROVIDER", "ollama_url": "OLLAMA_URL",
+            "ollama_model": "OLLAMA_MODEL", "ollama_context": "OLLAMA_CONTEXT",
+            "ollama_timeout": "OLLAMA_TIMEOUT",
             "reports_dir": "RADAR_REPORTS_DIR", "config_path": "RADAR_CONFIG",
             "timezone": "RADAR_TIMEZONE", "delivery_time": "RADAR_DELIVERY_TIME",
         }
@@ -74,6 +82,8 @@ class Settings(BaseModel):
 
 class Watchlist(BaseModel):
     assets: dict
+    priority: list[str] = Field(default_factory=list)
+    publication: dict = Field(default_factory=lambda: {"stocks": 5, "etfs": 3, "crypto": 3, "observe": 5})
     market_symbols: dict[str, str] = Field(default_factory=dict)
     discovery: dict
     weights: dict[str, dict[str, float]]

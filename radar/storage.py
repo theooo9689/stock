@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -24,6 +25,8 @@ class Store:
               PRIMARY KEY(day,part));
             CREATE TABLE IF NOT EXISTS costs(day TEXT, request_id TEXT PRIMARY KEY,
               amount REAL, reserved REAL, detail TEXT);
+            CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY, day TEXT, payload TEXT);
+            CREATE TABLE IF NOT EXISTS report_versions(id TEXT PRIMARY KEY, day TEXT, payload TEXT);
             """)
 
     @contextmanager
@@ -62,8 +65,25 @@ class Store:
 
     def save_report(self, day, report):
         with self.db() as db:
+            if report.get('snapshot_id'):
+                db.execute('INSERT OR IGNORE INTO report_versions VALUES(?,?,?)',
+                           (hashlib.sha256(json.dumps(report,sort_keys=True,allow_nan=False).encode()).hexdigest(),day,json.dumps(report,allow_nan=False)))
             db.execute("INSERT OR REPLACE INTO reports VALUES(?,?,?,?)",
                        (day, report["status"], json.dumps(report, allow_nan=False), datetime.now(timezone.utc).isoformat()))
+
+    def save_snapshot(self, identifier, day, payload):
+        with self.db() as db:
+            db.execute('INSERT OR IGNORE INTO snapshots VALUES(?,?,?)',(identifier,day,json.dumps(payload,allow_nan=False)))
+
+    def versions(self, day):
+        with self.db() as db:
+            rows=db.execute('SELECT id FROM report_versions WHERE day=? ORDER BY rowid DESC',(day,)).fetchall()
+        return [r[0] for r in rows]
+
+    def report_version(self, identifier):
+        with self.db() as db:
+            row=db.execute('SELECT payload FROM report_versions WHERE id=?',(identifier,)).fetchone()
+        return json.loads(row[0]) if row else None
 
     def claim_delivery(self, day, part):
         # Claim before network I/O. An ambiguous timeout remains 'sending' for manual reconciliation.
