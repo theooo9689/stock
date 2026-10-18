@@ -58,7 +58,7 @@ Etapas: coleta → cálculos → qualidade/liquidez → investigação individua
 As três dimensões ficam separadas:
 
 - **Qualidade dos dados:** fonte, horário, atualidade, liquidez e requisitos por classe. ETF exige custos/composição com período efetivo; data da coleta não comprova data da carteira. Cripto exige prova adicional de tokenomics, adoção e segurança; market cap/FDV sozinho nunca significa cobertura total.
-- **Atratividade:** critérios calculados com os dados disponíveis, normalizados pelos pesos observados e arredondados a cinco pontos. Não usa notas inventadas pelo modelo. Exige qualidade ≥80%, ausência de lacunas críticas e peso disponível ≥60%; do contrário, nota `null`.
+- **Atratividade:** critérios calculados com os dados disponíveis, normalizados pelos pesos observados e arredondados a cinco pontos. Não usa notas inventadas pelo modelo. Exige qualidade ≥80%, ausência de lacunas críticas e peso disponível ≥60% (50% para o núcleo quantitativo de cripto, além das provas obrigatórias); do contrário, nota `null`.
 - **Confiança:** evidências verificadas e revisão aprovada; não é probabilidade de retorno.
 
 Dados insuficientes geram **ANÁLISE INCONCLUSIVA — DADOS INSUFICIENTES**, nunca uma nota zero de investimento. Compra parcial exige nota ≥75, tese validada, revisão e ausência de alertas de deterioração; ações ainda exigem preço abaixo do limite com margem de segurança do DCF. Sem tese aprovada, indicador favorável não gera compra. As regras são heurísticas auditáveis, não validação estatística de uma estratégia.

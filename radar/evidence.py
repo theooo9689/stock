@@ -63,7 +63,8 @@ def asset_documents(http, asset, news_docs):
     if profiles.get('source'):primary_hosts.append(urlparse(profiles['source']).hostname)
     docs=[d for d in news_docs if symbol.lower() in d['title'].lower() or name.lower() in d['title'].lower()]
     urls=[profiles['source']] if profiles.get('source') else []
-    urls += [r['url'] for r in search(http, f'{name} {symbol} investor relations latest earnings results cash flow risks')]
+    query=(f'{name} {symbol} protocol tokenomics emissions unlocks adoption network security risks official' if asset['category']=='crypto' else f'{name} {symbol} investor relations latest earnings results cash flow risks')
+    urls += [r['url'] for r in search(http,query)]
     seen={d['url'] for d in docs}
     for url in urls:
         if url in seen:continue

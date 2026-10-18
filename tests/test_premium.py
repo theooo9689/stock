@@ -205,3 +205,14 @@ def test_undated_news_is_skipped_and_redirects_remain_public(tmp_path):
     h=HTTP(Store(tmp_path/'state.db'),httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(APIError):h.get('https://example.org/news')
     assert len(urls)==1
+
+
+def test_crypto_has_a_scoring_route_only_after_required_diligence():
+    a=stock();a['category']='crypto';a['crypto']={'market_cap':100,'fully_diluted_valuation':100,'circulating_supply':100,'total_volume':20}
+    for field in ('tokenomics_verified','adoption_verified','security_verified'):
+        a['crypto'][field]={'checked':True,'source':'https://example.org/verified-diligence','as_of':'2026-10-18','quote':'SYNTHETIC fixture representing separately verified due diligence.'}
+    thesis={'premium':{'validated':True,'review':{'approved':True}}}
+    rank=score_asset(a,WL.weights,thesis)
+    assert rank['score'] is not None
+    a['crypto'].pop('adoption_verified')
+    assert score_asset(a,WL.weights,thesis)['score'] is None

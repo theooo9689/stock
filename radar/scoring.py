@@ -100,7 +100,8 @@ def score_asset(asset, weights, thesis=None):
     w = weights[kind]
     quality = data_quality(asset)
     component_coverage = sum(w[k] for k in parts if k in w)
-    sufficient = quality["coverage"] >= .8 and not quality["critical_missing"] and component_coverage >= .6
+    minimum_weight=.5 if kind=="crypto" else .6
+    sufficient = quality["coverage"] >= .8 and not quality["critical_missing"] and component_coverage >= minimum_weight
     score = 5 * round(sum(parts[k]["score"] * w[k] for k in parts if k in w) / component_coverage / 5) if sufficient else None
     premium = (thesis or {}).get("premium", {})
     evidence_ok = bool(premium.get("validated") and premium.get("review", {}).get("approved"))
