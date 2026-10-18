@@ -133,7 +133,7 @@ def generate(report, directory):
     env.filters["metric_table"] = metric_table
     text = env.get_template("report.md.j2").render(r=report)
     md, pdf, data = [directory / (stem + ext) for ext in (".md", ".pdf", ".json")]
-    md.write_text(text)
-    data.write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False))
+    md.write_text(text, encoding="utf-8")
+    data.write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
     render_pdf(text, pdf)
     return {"markdown": md, "pdf": pdf, "json": data}

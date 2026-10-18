@@ -89,7 +89,7 @@ class Watchlist(BaseModel):
 
     @classmethod
     def load(cls, path):
-        return cls.model_validate(yaml.safe_load(Path(path).read_text()))
+        return cls.model_validate(yaml.safe_load(Path(path).read_text(encoding="utf-8")))
 
     def instruments(self):
         result = []

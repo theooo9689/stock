@@ -180,7 +180,7 @@ class Research:
             # Persist canonical output for audit; no credentials in requests/responses.
             audit = s.data_dir / "research"
             audit.mkdir(exist_ok=True)
-            (audit / f"{day}-{request_id}.json").write_text(response.model_dump_json(indent=2))
+            (audit / f"{day}-{request_id}.json").write_text(response.model_dump_json(indent=2), encoding="utf-8")
             if response.status != "completed":
                 raise RuntimeError("Pesquisa não concluída: " + response.status)
             result = ResearchResult.model_validate_json(response.output_text)
