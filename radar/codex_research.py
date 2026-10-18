@@ -52,6 +52,7 @@ class CodexResearch:
         self.error_reason = None
 
     def _invoke(self, args, **kwargs):
+        kwargs.setdefault('creationflags',getattr(subprocess,'CREATE_NO_WINDOW',0))
         kwargs.setdefault('env',{k:v for k,v in os.environ.items() if k not in ('OPENAI_API_KEY','CODEX_API_KEY','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','FMP_API_KEY','OPENAI_BASE_URL')})
         try:
             return self.runner([self.executable, *args], capture_output=True, text=True, encoding='utf-8',
