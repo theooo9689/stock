@@ -55,14 +55,14 @@ def search(http, query):
     except ET.ParseError:return []
 
 
-def asset_documents(http, asset, news_docs):
+def asset_documents(http, asset, news_docs, extra_urls=()):
     symbol=asset['symbol']; name=asset.get('name',symbol)
     host=urlparse(asset.get('business',{}).get('website') or '').hostname
     profiles=asset.get('etf_profile',{})
     primary_hosts=[host] if host else []
     if profiles.get('source'):primary_hosts.append(urlparse(profiles['source']).hostname)
     docs=[d for d in news_docs if symbol.lower() in d['title'].lower() or name.lower() in d['title'].lower()]
-    urls=[profiles['source']] if profiles.get('source') else []
+    urls=([profiles['source']] if profiles.get('source') else [])+list(extra_urls)
     query=(f'{name} {symbol} protocol tokenomics emissions unlocks adoption network security risks official' if asset['category']=='crypto' else f'{name} {symbol} investor relations latest earnings results cash flow risks')
     urls += [r['url'] for r in search(http,query)]
     seen={d['url'] for d in docs}

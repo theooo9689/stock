@@ -88,6 +88,67 @@ def news_research(ai, docs, day):
     return result,failures
 
 
+class NewsBatch(BaseModel):
+    model_config={'extra':'forbid'}
+    items: list[NewsAnalysis]
+
+
+class NewsReviewItem(BaseModel):
+    model_config={'extra':'forbid'}
+    document_id: str
+    review: CriticalReview
+
+
+class NewsReviews(BaseModel):
+    model_config={'extra':'forbid'}
+    items: list[NewsReviewItem]
+
+
+def batch_news_research(ai, docs, day):
+    """Batch Codex analysis/review to avoid a separate subscription session per article."""
+    eligible=[]
+    for d in docs:
+        try:
+            date=datetime.fromisoformat((d.get('published_at') or '').replace('Z','+00:00'))
+            if date.tzinfo is None:date=date.replace(tzinfo=timezone.utc)
+            end=datetime.fromisoformat(day).replace(tzinfo=timezone.utc)+timedelta(days=1)
+            if end-timedelta(days=4)<=date<=end:eligible.append(d)
+        except (ValueError,TypeError):continue
+    batches=[];batch=[];size=0
+    for d in eligible:
+        length=len(json.dumps(d,ensure_ascii=False).encode())
+        if batch and size+length>ai.input_budget_bytes-18000:batches.append(batch);batch=[];size=0
+        batch.append(d);size+=length
+    if batch:batches.append(batch)
+    result=[];failures=[]
+    for batch in batches:
+        try:
+            response=ai.complete('news-context-batch-v1',NewsBatch,{'documents':batch,'watchlist':PRIORITY,'day':day},
+                'Selecione até cinco notícias financeiras materiais destes documentos. Cada item deve citar document_id e trecho literal que sustente o fato. '
+                'Separe contexto anterior, surpresa confirmada (se não confirmada, diga), mecanismo econômico, efeito observado, cenários positivo/negativo, '
+                'ativos afetados, impacto na watchlist e o que monitorar. Não atribua política fiscal ao banco central nem invente reações de preços. '
+                'Use somente estes documentos; títulos sóbrios. Não preencha uma cota com notícias irrelevantes.')
+            lookup={d['id']:d for d in batch};accepted=[]
+            for item in response.items:
+                doc=lookup.get(item.document_id)
+                if doc and len(item.quote)>=60 and normalized(item.quote) in normalized(doc['text']) and item.affected:
+                    accepted.append(item)
+            if not accepted:continue
+            reviews=ai.complete('news-review-batch-v1',NewsReviews,{'documents':batch,'news':[n.model_dump() for n in accepted]},
+                'Revise separadamente cada notícia contra o documento e retorne document_id e review. Reprove fato/título incorreto, fonte/data não confirmada, '
+                'citação que não sustenta a alegação, números sem suporte, causalidade indevida e erros econômicos. Reações de mercado precisam ser observadas, não supostas.')
+            checks={v.document_id:v.review for v in reviews.items}
+            for item in accepted:
+                review=checks.get(item.document_id);doc=lookup[item.document_id]
+                if not review or not all((review.approved,review.numeric_consistency,review.citations_support_claims,review.strongest_objection_addressed)) or review.unsupported_claims:continue
+                result.append({**item.model_dump(),'evidence':{'fact':item.fact,'source_url':doc['url'],'published_at':doc['published_at']},
+                    'interpretation':item.mechanism,'verification':{'supporting_quote':item.quote,'document_sha':doc['sha256'],'review':review.model_dump()}})
+        except LocalAIError as exc:
+            failures.append({'stage':'news_review','failure':str(exc)});break
+        if len(result)>=10:break
+    return result[:10],failures
+
+
 def upgrade_report(original, watchlist=None):
     """Regenerate the problematic report safely without trusting its old scores/AI claims."""
     r=copy.deepcopy(original)
@@ -120,21 +181,28 @@ def enrich(settings, store, wl, report, http, ai_enabled=True):
     r['research']={'summary':'','summaries':[],'news':[],'events':report.get('research',{}).get('events',[]),'risks':[], 'limitations':[], 'sources':[]}
     ai=None
     try:
-        if settings.research_provider!='ollama':raise LocalAIError('Pesquisa local desabilitada pela configuração')
         if not ai_enabled:raise LocalAIError('IA desativada; edição factual de dados')
-        ai=Ollama(settings,store)
+        if settings.research_provider=='codex':
+            from .codex_research import CodexResearch
+            ai=CodexResearch(settings,store)
+        elif settings.research_provider=='ollama':ai=Ollama(settings,store)
+        else:raise LocalAIError('Pesquisa desabilitada pela configuração')
         r['ai']=ai.doctor()
     except LocalAIError as exc:
-        r['ai']={'provider':'ollama','model':settings.ollama_model,'ready':False,'reason':str(exc),'cloud_cost_usd':0}
-        r['failures'].append({'stage':'local_model','failure':str(exc)})
+        r['ai']={'provider':settings.research_provider,'model':settings.codex_model if settings.research_provider=='codex' else settings.ollama_model,'ready':False,'reason':str(exc),'cloud_cost_usd':0}
+        r['failures'].append({'stage':'subscription_research' if settings.research_provider=='codex' else 'local_model','failure':str(exc)})
     docs=[]
     if r['ai']['ready']:
         docs,errors=collect_documents(http,r.get('headlines',[]));r['failures'].extend(errors)
-        r['research']['news'],errors=news_research(ai,docs,r['day']);r['failures'].extend(errors)
-        candidates=research_candidates(r['assets'],wl.publication)
+        r['research']['news'],errors=(batch_news_research(ai,docs,r['day']) if getattr(ai,'large_context',False) else news_research(ai,docs,r['day']));r['failures'].extend(errors)
+        caps=dict(wl.publication)
+        if settings.research_provider=='codex':caps.update(stocks=min(3,caps.get('stocks',3)),etfs=min(2,caps.get('etfs',2)),crypto=min(1,caps.get('crypto',1)))
+        candidates=research_candidates(r['assets'],caps)
         for asset in candidates:
+            if getattr(ai,'error_reason',None):break
             try:
-                sources=asset_documents(http,asset,docs)
+                extra=ai.find_sources(asset) if hasattr(ai,'find_sources') else []
+                sources=asset_documents(http,asset,docs,extra)
                 if len(sources)<2:
                     r['failures'].append({'stage':'evidence','asset':asset['symbol'],'failure':'Menos de duas fontes recuperadas; não publicar tese'});continue
                 known={d['id'] for d in docs}
@@ -146,6 +214,9 @@ def enrich(settings, store, wl, report, http, ai_enabled=True):
                 r['failures'].append({'stage':'deep_research','asset':asset['symbol'],'failure':str(exc)})
                 break
         r['ai']['investigated']=[a['symbol'] for a in candidates]
+    if ai and getattr(ai,'error_reason',None):
+        r['ai']['ready']=False;r['ai']['reason']=ai.error_reason
+        r['failures'].append({'stage':'subscription_research','failure':ai.error_reason})
     for a in r['assets']:a['ranking']=score_asset(a,wl.weights,a.get('thesis'))
     r['publication']=publication(r['assets'],wl.priority or PRIORITY,wl.publication)
     if ai and r['ai']['ready'] and (r['publication']['selected'] or r['research']['news']):
@@ -153,7 +224,7 @@ def enrich(settings, store, wl, report, http, ai_enabled=True):
             items=[{'type':'news','content':n} for n in r['research']['news']]
             items.extend({'type':'opportunity','symbol':a['symbol'],'ranking':a['ranking'],'thesis':a.get('thesis')} for a in r['assets'] if a['symbol'] in r['publication']['selected'])
             batches=[];batch=[];size=0
-            budget=max(4000,settings.ollama_context*2-24000)
+            budget=getattr(ai,'input_budget_bytes',max(4000,settings.ollama_context*2-24000))-8000
             for item in items:
                 item_size=len(json.dumps(item,ensure_ascii=False).encode())
                 if batch and size+item_size>budget:batches.append(batch);batch=[];size=0
@@ -189,5 +260,6 @@ def enrich(settings, store, wl, report, http, ai_enabled=True):
     snapshot={'inputs':stable(report),'documents':docs,'model':r['ai'],'parameters':r['audit']['parameters'],'methodology':METHODOLOGY}
     r['snapshot_id']=digest(snapshot)
     store.save_snapshot(r['snapshot_id'],r['day'],snapshot)
-    r['cost']={'provider':'ollama','cloud_api_usd':0,'note':'Execução local; tempo/energia e dados/licenças externos não são custo de API OpenAI.'}
+    r['cost']={'provider':settings.research_provider,'cloud_api_usd':0,'subscription_usage':store.subscription_usage(r['day']) if settings.research_provider=='codex' else [],
+               'note':'Codex usa a franquia ChatGPT/Codex; sem compra de créditos ou fallback API. Não garante caber diariamente na franquia.' if settings.research_provider=='codex' else 'Execução local Ollama; sem API paga.'}
     return r

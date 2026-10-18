@@ -1,30 +1,41 @@
-# Radar de Investimentos — Premium local
+# Radar de Investimentos — ChatGPT Plus + Codex oficial
 
-Pesquisa diária com coleta verificável, cálculos determinísticos, investigação e revisão por **Ollama local**, PDF e Telegram. O pipeline premium não chama a OpenAI e não exige créditos. Não executa ordens.
+A viabilidade foi verificada antes da implementação: [tabela, fontes e limites](docs/viabilidade-chatgpt-plus.md). **Plus não inclui API paga.** O modo padrão agora usa o **Codex CLI oficial com login ChatGPT**, dentro da franquia da conta; não inicia Ollama nem usa chave OpenAI. A pesquisa do Codex não é o produto Deep Research.
 
-## Windows: instalar e iniciar ao ligar o notebook
+Há duas formas suportadas de usar esta entrega:
 
-1. Extraia o ZIP inteiro e execute **INSTALAR_WINDOWS.cmd**.
-2. O instalador cria `%LOCALAPPDATA%\RadarInvestimentos`, instala Python/dependências e tenta instalar Ollama pelo winget e baixar o modelo configurado. O download inicial exige vários GB e pode demorar.
-3. Configure `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` no `.env` local, se ainda não preenchidos. O destinatário precisa iniciar o bot com `/start`.
-4. A tarefa inicia ao entrar no Windows: prepara às **19h30** e entrega às **20h30 de Brasília**. Ao entrar depois das 20h30, tenta entregar a edição do dia. O notebook precisa estar ligado e conectado; suspensão/desligamento impedem processamento naquele momento. Se a pesquisa ainda estiver rodando, a entrega aguarda.
+## Plano A: tarefa dentro do ChatGPT e encaminhamento manual
 
-O instalador mantém a configuração existente, tenta reutilizar o Ollama e baixa somente o modelo ausente. `OLLAMA_MODEL` permite preservar outro modelo local compatível. Reexecutar atualiza os arquivos sem apagar histórico. `EXECUTAR_AGORA.cmd` gera/envia manualmente; `DESINSTALAR_WINDOWS.cmd` remove a inicialização automática e preserva dados. Logs: `data\logs\radar.log`. O instalador funciona sem administrador, usando Agendador de Tarefas ou pasta Inicializar como alternativa.
+Use o [pedido completo e instruções](docs/tarefa-chatgpt.md) para criar uma tarefa na interface oficial, diariamente às **20h30 America/Sao_Paulo**, com notificações ChatGPT. Este projeto e esta sessão não criaram essa tarefa: é preciso verificar o cartão de confirmação e a lista Scheduled na conta. Não há API pública documentada para este programa ler os resultados pessoais de Tasks.
 
-Este workspace não acessa diretamente o notebook: a execução do instalador ocorre nele. O workflow diário na nuvem continua somente manual; não ative dois agendadores com bancos independentes.
+Acesso a busca, anexos e modelos depende das ferramentas disponíveis na tarefa. Não há confirmação explícita, nos documentos consultados, de que Tasks pode acionar automaticamente o produto Deep Research; não prometemos esse encadeamento, PDF automático ou Telegram direto. Para pesquisa pelo Deep Research interativo, use sua exportação oficial de PDF/Word/Markdown.
 
-## Ollama e diagnóstico
+Para encaminhar o PDF que você baixou oficialmente, execute **INSTALAR_CHATGPT_MANUAL.cmd** e depois **ENCAMINHAR_PDF.cmd**. Esse modo instala o componente local sem Codex/Ollama, desativa o agendador local anterior e não cria uma tarefa ChatGPT. O encaminhamento é manual e deduplicado por conteúdo/dia. O notebook só precisa estar ligado durante o encaminhamento; a tarefa ChatGPT na nuvem é independente dele.
 
-Padrão: `qwen3:8b`, contexto 32768, até 600 segundos por chamada, temperatura zero e seed 42. O diagnóstico exige modelo ≥7B e capacidade/contexto ≥16k; recusa modelos pequenos e saída incompleta. Isso não garante qualidade: toda tese ainda exige validação e revisão.
+## Plano B: pesquisa e Telegram automáticos no notebook
+
+Extraia o ZIP inteiro e execute **INSTALAR_WINDOWS.cmd**. O instalador atualiza `%LOCALAPPDATA%\RadarInvestimentos`, configura Python/dependências, tenta instalar o CLI oficial `@openai/codex` via npm e solicita o **login oficial na sua conta ChatGPT** quando necessário. Node.js LTS pode exigir autorização de instalação do Windows. Login por API key é recusado; a tarefa só é ativada depois do diagnóstico local. Isso não garante que a sessão/limite esteja válido no serviço: confira a primeira execução real.
+
+Ele preserva Telegram e histórico e altera somente `RESEARCH_PROVIDER` para `codex`. O login não vai no `.env` e não deve ser compartilhado; o cliente oficial administra a autenticação. O app ChatGPT não precisa ficar aberto para a automação via CLI. O **notebook deve estar ligado, conectado e com sessão Windows ativa**. Não é possível ativar a tarefa no seu notebook a partir deste workspace.
+
+O trabalhador inicia no login, prepara às **19h30** e entrega às **20h30 de Brasília**. A tarefa entra na fila se a pesquisa demorar. Ao entrar depois do horário, tenta entregar a edição do dia. Suspensão/desligamento impedem processamento naquele momento. `EXECUTAR_AGORA.cmd` gera/envia manualmente; `DESINSTALAR_WINDOWS.cmd` remove a automação e preserva dados.
 
 ```cmd
-ollama pull qwen3:8b
+codex login
 .venv\Scripts\python.exe -m radar.cli doctor
 ```
 
-O comando mostra RAM e capacidade do modelo. Com 16 GB, tente 8B quantizado; 32 GB ou mais permite considerar `qwen3:14b`. Memória livre, GPU e tamanho do contexto afetam desempenho: 32k pode exceder o que cabe no notebook. Ajuste o modelo/contexto no `.env` e rode o diagnóstico. Se o modelo faltar, a pesquisa falhar ou o contexto exceder o limite, a edição será **factual e parcial**, com lacunas explícitas, sem substituir a análise por texto genérico ou chamar API paga.
+O diagnóstico informa modo de login e opções locais do CLI; não testa o saldo/franquia nem valida uma inferência no serviço. **Neste workspace, a inferência real foi recusada com 401 e pediu novo login.** Não houve relatório financeiro Codex concluído aqui. O código, as validações e a integração foram testados com mocks; a autenticação e a primeira pesquisa precisam ser verificadas no notebook.
 
-## Uso direto e desenvolvimento
+## Franquia e falhas
+
+Modelo padrão `gpt-6.1-sol`, raciocínio alto, até 900 segundos por chamada. A disponibilidade deve ser confirmada na conta; `CODEX_MODEL` permite selecionar outro modelo disponível. A descoberta usa busca oficial; documentos recuperados por HTTP e métricas calculadas são fornecidos à análise. Notícias são analisadas/revisadas em lotes, e a investigação se limita a até três ações, dois ETFs e uma cripto entre candidatos elegíveis, sem cotas de compra.
+
+Há limite **local** persistente de 20 chamadas/dia (`CODEX_MAX_DAILY_CALLS`), cache e auditoria. Isso não é um limite monetário da conta nem garantia de que a franquia Plus comporte pesquisa diária extensa. Contexto, busca e raciocínio consomem franquia. O programa não compra créditos, não faz fallback para chave API e não escolhe automaticamente outro provedor. Confira no produto os limites reais e quaisquer configurações de compra automática/créditos adicionais.
+
+Falha de login, quota, fonte ou revisão gera uma edição parcial/factual; compras sem evidência não são publicadas. Tentativas interrompidas ficam registradas sem repetição cega. Alterar apenas o horário de coleta não repete inferência com os mesmos dados. Logs: `data/logs/radar.log`; entradas/respostas/eventos oficiais: `data/codex-research/`; consumo de chamadas: `radar status`. Não ative dois agendadores com bancos separados.
+
+## Uso direto
 
 ```bash
 python3.12 -m venv .venv
@@ -32,22 +43,23 @@ source .venv/bin/activate
 pip install --require-hashes -r requirements.lock
 pip install --no-deps -e .
 cp .env.example .env
-# Preencha somente os dois campos Telegram para entrega.
+# Configure Telegram. Não é necessário preencher OPENAI_API_KEY.
+# Instale o CLI oficial conforme developers.openai.com/codex/cli, então:
+codex login
 radar doctor
-radar test-telegram
-radar run --refresh             # coleta + investigação local + PDF, sem enviar
-radar run --refresh --no-ai     # coleta real, edição factual
-radar run --send                # envia a edição salva ou prepara uma nova
-radar preview                  # gera arquivos do resultado salvo, sem rede
-radar replay reports/radar-2026-10-18.json # migra histórico sem confiar nas teses antigas
-radar demo --deep              # tese fictícia para inspecionar layout, nunca envia
-radar versions                 # IDs imutáveis do dia
-radar render-version ID        # reproduz resposta congelada, sem rede/inferência
-radar tick                     # verifica horário e retoma entrega diária
+radar run --refresh               # pesquisa Codex + PDF, sem enviar
+radar run --send                  # envia a edição salva ou prepara se ausente
+radar run --refresh --no-ai       # somente dados reais, sem Codex/Ollama
+radar forward exportado.pdf       # exportação oficial baixada manualmente
+radar forward exportado.pdf --summary resumo.txt
+radar preview                    # renderiza a edição salva, sem rede
+radar versions                   # versões imutáveis do dia
+radar render-version ID          # resposta congelada, sem inferência
+radar demo --deep                # exemplo fictício, nunca enviado
 pytest -q
 ```
 
-`--refresh` refaz dados/pesquisa, mas não apaga a deduplicação de envio. `--edition nome` identifica uma edição de teste independente. Um timeout Telegram pode significar que a mensagem chegou: o registro fica `sending` e exige conferir o destino antes de reenviar; não há retry cego de envios ambíguos.
+`--refresh` refaz a pesquisa sem apagar deduplicação. `--edition nome` identifica uma edição independente. Timeout Telegram pode significar que o envio chegou; o estado fica `sending`, exigindo conferir o destino antes de reenviar. Campos e módulos Ollama/API antigos permanecem apenas para compatibilidade/opção explícita, sem uso no caminho Codex.
 
 ## Funil e decisões
 
@@ -79,10 +91,10 @@ DCF exige três anos positivos de FCF, normaliza pelo menor entre FCF recente e 
 
 `reports/radar-premium-DATA-HASH.{pdf,html,json,md}` contém relatório seletivo com 11 seções, sumário clicável, tabelas, páginas e fontes. O HTML é prévia visual local das mensagens Telegram; texto é escapado e repartido preservando tags e caracteres UTF-16. PDFs completos são anexados. `demo` é explicitamente sintético e nunca enviado.
 
-`data/radar.sqlite3` guarda estado/deduplicação, snapshots e versões imutáveis de relatórios. `data/local-research/` registra entradas, respostas, identidade/digest do modelo, contexto, seed e uso local. Mesmas entradas/metodologia produzem a mesma atratividade; cache inclui prompt/esquema/modelo. Inferência local pode variar entre hardware/backend, portanto a resposta congelada e a versão do relatório permitem auditoria. Compare snapshots antes de interpretar mudanças. Faça backup de `data` e `reports`.
+`data/radar.sqlite3` guarda estado/deduplicação, snapshots e versões imutáveis de relatórios. `data/codex-research/` registra entradas, saídas oficiais, eventos e versão/modelo do CLI. O modo Ollama legado mantém sua auditoria separada. Mesmas entradas/metodologia produzem a mesma atratividade; cache inclui prompt/esquema/modelo/versão do CLI. Inferência pode variar entre versões/backend, portanto a resposta congelada e a versão do relatório permitem auditoria. Compare snapshots antes de interpretar mudanças. Faça backup de `data` e `reports`.
 
-`.env`, dados privados e relatórios são ignorados no Git. Não imprima credenciais nem ative logs HTTP de debug. `scripts/build_windows_package.py arquivo.zip` gera fonte pública; `--configured` inclui configuração e backup SQLite e produz um ZIP **privado**, que não deve ser publicado ou compartilhado. A aplicação mantém os módulos antigos de pesquisa OpenAI apenas para compatibilidade/testes; o pipeline premium não os instancia.
+`.env`, dados privados e relatórios são ignorados no Git. Não imprima credenciais nem ative logs HTTP de debug. `scripts/build_windows_package.py arquivo.zip` gera fonte pública; `--configured` inclui configuração e backup SQLite e produz um ZIP **privado**, que não deve ser publicado ou compartilhado. A aplicação mantém os módulos antigos de pesquisa OpenAI apenas para compatibilidade/testes; o modo Codex não os instancia. O workflow diário GitHub fica manual e factual, sem login de assinatura em CI público.
 
 ## Validação
 
-Testes Linux e Windows verificam cálculos financeiros/técnicos, feriados, calendário, entrega/deduplicação, retomada e locks, parser PowerShell, limites/escaping HTML, snapshots e revisão. A fixture `tests/fixtures/problem-2026-10-18.json` preserva entradas objetivas do relatório problemático para impedir regressões de notas, cobertura, compras sem tese e PDF excessivo. Testes locais usam mocks; execução com dados reais e Ollama é uma verificação adicional dependente de rede/modelo/hardware.
+Testes Linux e Windows verificam cálculos financeiros/técnicos, feriados, calendário, entrega/deduplicação, retomada e locks, parser PowerShell, limites/escaping HTML, snapshots e revisão. A fixture `tests/fixtures/problem-2026-10-18.json` preserva entradas objetivas do relatório problemático para impedir regressões de notas, cobertura, compras sem tese e PDF excessivo. Testes locais usam mocks; execução real com Codex é uma verificação adicional dependente de login, franquia e rede. O teste neste workspace chegou ao serviço e recebeu 401, sem inferência concluída.

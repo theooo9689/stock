@@ -21,29 +21,13 @@ def main():
     sys.stderr = open(os.devnull, "w")
     for name in ("httpx", "httpcore", "openai", "yfinance", "curl_cffi"):
         logging.getLogger(name).setLevel(logging.CRITICAL)
+    # npm's user install directory is not always inherited by Task Scheduler.
+    npm_bin = str(Path(os.environ.get('APPDATA', '')) / 'npm')
+    os.environ['PATH'] = npm_bin + os.pathsep + os.environ.get('PATH','')
     from radar.config import Settings
     from radar.scheduler import tick
     from radar.storage import Store
     from radar.telegram import Telegram
-
-    # Ollama must also be available after a fresh Windows login.
-    import subprocess
-    import urllib.request
-    try:
-        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:11434/api/tags', timeout=2):
-            pass
-    except Exception:
-        executable = Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Ollama' / 'ollama.exe'
-        if executable.is_file():
-            subprocess.Popen([str(executable), 'serve'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-            # Avoid freezing a factual edition while the new Ollama process is still binding its port.
-            for _ in range(10):
-                try:
-                    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:11434/api/tags', timeout=1):
-                        break
-                except Exception:
-                    time.sleep(0.5)
 
     def once():
         settings = None

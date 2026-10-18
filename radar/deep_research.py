@@ -100,7 +100,7 @@ def extract_sources(ai, documents, symbol):
 
 def investigate(ai, asset, documents):
     facts=factbook(asset)
-    extracted=extract_sources(ai,documents,asset["symbol"])
+    extracted=documents if getattr(ai,"large_context",False) else extract_sources(ai,documents,asset["symbol"])
     payload={'symbol':asset['symbol'],'name':asset.get('name'),'category':asset['category'],
              'business':asset.get('business',{}),'facts':facts,'financial_history':asset.get('financial_history',[]),
              'valuation_scenarios':asset.get('valuation',{}),'documents':extracted}

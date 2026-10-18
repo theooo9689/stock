@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'prepare pesquisa; deliver envia o relatório pronto ou pesquisa se necessário'
+        description: 'prepare coleta factual sem IA; deliver envia a edição factual pronta'
         type: choice
         default: prepare
         options: [prepare, deliver]
@@ -25,10 +25,8 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-      OPENAI_MODEL: gpt-4.1-mini
-      DAILY_BUDGET_USD: '3.00'
+      RESEARCH_PROVIDER: none
       RADAR_TIMEZONE: America/Sao_Paulo
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -56,7 +54,7 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          missing = [k for k in ('TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','OPENAI_API_KEY') if not os.getenv(k)]
+          missing = [k for k in ('TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID') if not os.getenv(k)]
           if missing:
               raise SystemExit('Secrets ausentes: ' + ', '.join(missing))
           PY

@@ -25,6 +25,7 @@ class Store:
               PRIMARY KEY(day,part));
             CREATE TABLE IF NOT EXISTS costs(day TEXT, request_id TEXT PRIMARY KEY,
               amount REAL, reserved REAL, detail TEXT);
+            CREATE TABLE IF NOT EXISTS subscription_calls(id TEXT PRIMARY KEY, day TEXT, purpose TEXT, state TEXT, detail TEXT);
             CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY, day TEXT, payload TEXT);
             CREATE TABLE IF NOT EXISTS report_versions(id TEXT PRIMARY KEY, day TEXT, payload TEXT);
             """)
@@ -84,6 +85,24 @@ class Store:
         with self.db() as db:
             row=db.execute('SELECT payload FROM report_versions WHERE id=?',(identifier,)).fetchone()
         return json.loads(row[0]) if row else None
+
+    def claim_subscription_call(self, day, identifier, purpose, limit):
+        from .local_ai import LocalAIError
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT 1 FROM subscription_calls WHERE id=?',(identifier,)).fetchone():
+                raise LocalAIError('Tentativa Codex já registrada sem cache utilizável; conferir histórico antes de repetir.')
+            count=db.execute('SELECT COUNT(*) FROM subscription_calls WHERE day=?',(day,)).fetchone()[0]
+            if count>=limit:raise LocalAIError('Limite diário local de chamadas Codex atingido; nenhuma API paga será usada.')
+            db.execute('INSERT INTO subscription_calls VALUES(?,?,?, ?,?)',(identifier,day,purpose,'started','{}'))
+
+    def finish_subscription_call(self, identifier, state, detail):
+        with self.db() as db:
+            db.execute('UPDATE subscription_calls SET state=?,detail=? WHERE id=?',(state,json.dumps(detail),identifier))
+
+    def subscription_usage(self, day):
+        with self.db() as db:
+            return [{'state':state,'calls':count} for state,count in db.execute('SELECT state,COUNT(*) FROM subscription_calls WHERE day=? GROUP BY state',(day,))]
 
     def claim_delivery(self, day, part):
         # Claim before network I/O. An ambiguous timeout remains 'sending' for manual reconciliation.

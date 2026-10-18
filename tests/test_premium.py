@@ -165,7 +165,7 @@ def test_real_problem_report_regression(tmp_path):
 def test_local_failure_yields_factual_report_without_cloud(tmp_path,monkeypatch):
     def unavailable(self):raise LocalAIError('Ollama indisponível')
     monkeypatch.setattr(Ollama,'doctor',unavailable)
-    s=Settings(data_dir=tmp_path)
+    s=Settings(data_dir=tmp_path,research_provider="ollama")
     raw={'day':'2026-10-18','generated_at':'2026-10-18T12:00:00Z','status':'parcial','assets':[stock()],'macro':[],'headlines':[],'research':{}}
     report=enrich(s,Store(tmp_path/'db'),WL,raw,None)
     assert not report['ai']['ready'] and report['cost']['cloud_api_usd']==0

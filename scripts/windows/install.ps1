@@ -1,4 +1,5 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([ValidateSet('Codex','ChatGPT')][string]$Mode = 'Codex')
+$ErrorActionPreference = 'Stop'
 $SourceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $AppRoot = Join-Path $env:LOCALAPPDATA 'RadarInvestimentos'
 $Identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
@@ -41,17 +42,21 @@ try {
 
     # Stop only this application's previous installations before updating its files.
     $Existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    if ($Existing) { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue }
+    if ($Existing) {
+        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        Disable-ScheduledTask -TaskName $TaskName | Out-Null
+    }
+    if (Test-Path -LiteralPath $StartupLink) { Remove-Item -LiteralPath $StartupLink }
     $OldWorker = Join-Path $AppRoot 'scripts\windows\worker.py'
     Get-CimInstance Win32_Process -Filter "Name='pythonw.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -and $_.CommandLine.Contains($OldWorker) } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
 
     if ($SourceRoot -ne $AppRoot) {
-        foreach ($Name in @('radar','config','scripts')) {
+        foreach ($Name in @('radar','config','scripts','docs')) {
             Copy-Item -LiteralPath (Join-Path $SourceRoot $Name) -Destination $AppRoot -Recurse -Force
         }
-        foreach ($Name in @('pyproject.toml','requirements.lock','requirements.txt','README.md','INSTALAR_WINDOWS.cmd','EXECUTAR_AGORA.cmd','DESINSTALAR_WINDOWS.cmd')) {
+        foreach ($Name in @('pyproject.toml','requirements.lock','requirements.txt','README.md','INSTALAR_WINDOWS.cmd','EXECUTAR_AGORA.cmd','DESINSTALAR_WINDOWS.cmd','ENCAMINHAR_PDF.cmd','INSTALAR_CHATGPT_MANUAL.cmd')) {
             Copy-Item -LiteralPath (Join-Path $SourceRoot $Name) -Destination $AppRoot -Force
         }
         foreach ($Name in @('.env','.env.example')) {
@@ -97,7 +102,18 @@ try {
     & $VenvPython -c "from radar.config import Settings,Watchlist; s=Settings.from_env(); Watchlist.load(s.config_path); missing=[n for n,v in (('TELEGRAM_BOT_TOKEN',s.telegram_token),('TELEGRAM_CHAT_ID',s.telegram_chat)) if not v.get_secret_value()]; assert not missing, 'Configuracao incompleta: '+', '.join(missing); import radar.scheduler"
     if ($LASTEXITCODE -ne 0) { throw 'Configuracao incompleta. Preencha o arquivo .env na pasta do radar e execute novamente.' }
 
-    & (Join-Path $AppRoot 'scripts\windows\setup-ollama.ps1')
+    # Migrate only the selected engine; preserve Telegram configuration and historical data.
+    $SelectedProvider = if ($Mode -eq 'ChatGPT') { 'none' } else { 'codex' }
+    & $VenvPython -c "from pathlib import Path; import re,sys; p=Path('.env'); s=p.read_text(encoding='utf-8-sig'); line='RESEARCH_PROVIDER='+sys.argv[1]; s=re.sub(r'^RESEARCH_PROVIDER=.*$', line, s, flags=re.M) if re.search(r'^RESEARCH_PROVIDER=',s,flags=re.M) else s+'\n'+line+'\n'; p.write_text(s,encoding='utf-8')" $SelectedProvider
+    if ($LASTEXITCODE -ne 0) { throw 'Falha ao selecionar o provedor Codex.' }
+    $env:RESEARCH_PROVIDER = $SelectedProvider
+    if ($Mode -eq 'ChatGPT') {
+        Write-Host 'Encaminhamento manual instalado. Nenhuma tarefa diaria local foi ativada.'
+        Write-Host 'Crie a tarefa na interface ChatGPT usando docs\tarefa-chatgpt.md.'
+        Write-Host 'Exporte o PDF no ChatGPT e use ENCAMINHAR_PDF.cmd.'
+        exit 0
+    }
+    & (Join-Path $AppRoot 'scripts\windows\setup-codex.ps1')
 
     $Worker = Join-Path $AppRoot 'scripts\windows\worker.py'
     $PythonW = Join-Path $AppRoot '.venv\Scripts\pythonw.exe'
@@ -111,6 +127,7 @@ try {
         $Principal = New-ScheduledTaskPrincipal -UserId $Identity.User.Value -LogonType Interactive -RunLevel Limited
         Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger @($AtLogin,$EveryMinute) -Settings $Settings -Principal $Principal -Description 'Radar local: pesquisa 19h30, envio 20h30 de Brasilia; retoma o dia ao entrar no Windows.' -Force | Out-Null
         if (Test-Path -LiteralPath $StartupLink) { Remove-Item -LiteralPath $StartupLink }
+        Enable-ScheduledTask -TaskName $TaskName | Out-Null
         Start-ScheduledTask -TaskName $TaskName
         Write-Host 'Inicializacao automatica registrada no Agendador de Tarefas.'
     } catch {

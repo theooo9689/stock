@@ -16,7 +16,13 @@ class Settings(BaseModel):
     openai_key: SecretStr = SecretStr("")
     fmp_key: SecretStr = SecretStr("")
     model: str = "gpt-4.1-mini"
-    research_provider: str = "ollama"
+    research_provider: str = "codex"
+    codex_executable: str = "codex"
+    codex_model: str = "gpt-6.1-sol"
+    codex_effort: str = "high"
+    codex_timeout: int = Field(default=900, ge=30, le=3600)
+    codex_max_calls: int = Field(default=20, ge=1, le=200)
+    codex_max_input_bytes: int = Field(default=150000, ge=10000, le=500000)
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:8b"
     ollama_context: int = Field(default=32768, ge=8192)
@@ -65,6 +71,9 @@ class Settings(BaseModel):
             "max_output_tokens": "RESEARCH_MAX_OUTPUT_TOKENS", "max_tool_calls": "RESEARCH_MAX_TOOL_CALLS",
             "background": "RESEARCH_BACKGROUND", "data_dir": "RADAR_DATA_DIR",
             "reasoning_effort": "OPENAI_REASONING_EFFORT",
+            "codex_executable":"CODEX_EXECUTABLE", "codex_model":"CODEX_MODEL", "codex_effort":"CODEX_REASONING_EFFORT",
+            "codex_timeout":"CODEX_TIMEOUT", "codex_max_calls":"CODEX_MAX_DAILY_CALLS",
+            "codex_max_input_bytes":"CODEX_MAX_INPUT_BYTES",
             "research_provider": "RESEARCH_PROVIDER", "ollama_url": "OLLAMA_URL",
             "ollama_model": "OLLAMA_MODEL", "ollama_context": "OLLAMA_CONTEXT",
             "ollama_timeout": "OLLAMA_TIMEOUT",

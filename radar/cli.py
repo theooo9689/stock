@@ -32,6 +32,9 @@ def main():
     versions.add_argument('--day')
     frozen=sub.add_parser('render-version',help='Renderiza resposta congelada de uma versão; sem inferência/rede')
     frozen.add_argument('id')
+    forward=sub.add_parser('forward',help='Encaminha PDF exportado manualmente do ChatGPT; não acessa sessões')
+    forward.add_argument('input',type=Path)
+    forward.add_argument('--summary',type=Path,help='Arquivo UTF-8 de resumo curto opcional')
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     # Prevent provider request URLs from entering logs.
@@ -53,13 +56,16 @@ def main():
                 raise RuntimeError("Nenhum relatório salvo para hoje")
             paths = generate(report, settings.reports_dir)
             print(json.dumps({k: str(v) for k,v in paths.items()}))
+        elif args.command == 'forward':
+            from .manual_delivery import forward_pdf
+            print(json.dumps(forward_pdf(settings,store,args.input,args.summary),ensure_ascii=False))
         elif args.command == "test-telegram":
             from .telegram import Telegram
             Telegram(settings, store).text(day, "teste-conexao", "Radar de Investimentos: conexão confirmada. Entrega prevista para 20h30 de Brasília quando o agendador estiver ativo.")
             print("Teste processado; envios repetidos no mesmo dia são ignorados.")
         elif args.command == "status":
             spent, reserved = store.cost(day)
-            print(json.dumps({"day": day, "estimated_usd": spent, "reserved_usd": reserved, "deliveries": store.delivery_states(day)}, ensure_ascii=False))
+            print(json.dumps({"day": day, "estimated_usd": spent, "reserved_usd": reserved, "subscription_calls":store.subscription_usage(day), "deliveries": store.delivery_states(day)}, ensure_ascii=False))
         elif args.command == "schedule":
             from .scheduler import start
             start(settings)
@@ -74,13 +80,18 @@ def main():
             if report is None:raise RuntimeError('Versão não encontrada')
             print(json.dumps({k:str(v) for k,v in generate(report,settings.reports_dir).items()},ensure_ascii=False))
         elif args.command == 'doctor':
-            from .local_ai import Ollama,LocalAIError
-            import psutil
-            ram=round(psutil.virtual_memory().total/2**30,1)
-            result={'ram_gb':ram,'recommended_model':'qwen3:14b' if ram>=32 else 'qwen3:8b' if ram>=16 else 'Modelo ≥7B exige mais RAM/contexto; não usar modelo pequeno para mascarar incapacidade.'}
-            try:result.update(Ollama(settings,store).doctor())
-            except LocalAIError as exc:result.update(ready=False,reason=str(exc))
+            from .local_ai import LocalAIError
+            if settings.research_provider=='codex':
+                from .codex_research import CodexResearch
+                engine=CodexResearch(settings,store)
+            elif settings.research_provider=='ollama':
+                from .local_ai import Ollama
+                engine=Ollama(settings,store)
+            else:raise LocalAIError('Pesquisa desabilitada pela configuração')
+            try:result=engine.doctor()
+            except LocalAIError as exc:result={'provider':settings.research_provider,'ready':False,'reason':str(exc)}
             print(json.dumps(result,ensure_ascii=False))
+            if not result.get('ready'):return 2
         elif args.command == 'replay':
             from .premium import upgrade_report
             from .report import generate

@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-foreach ($Name in @('install.ps1','uninstall.ps1','setup-ollama.ps1')) {
+foreach ($Name in @('install.ps1','uninstall.ps1','setup-ollama.ps1','setup-codex.ps1','forward-pdf.ps1')) {
     $Tokens = $null
     $ParseErrors = $null
     $Ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $Name), [ref]$Tokens, [ref]$ParseErrors)

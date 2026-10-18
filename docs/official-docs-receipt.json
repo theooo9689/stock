@@ -1,0 +1,81 @@
+{
+  "retrieved_on": "2026-10-18 UTC",
+  "note": "Documentação oficial, disponibilidade específica da conta não verificada por estes documentos.",
+  "sources": [
+    {
+      "name": "tasks",
+      "url": "https://help.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt",
+      "status": 200,
+      "chars": 12580,
+      "text_sha256": "7d9e204b90b4176e0a8dba34efcb9b7864bf6e220c8d225971bb22bf0a38fd1f"
+    },
+    {
+      "name": "deep-research",
+      "url": "https://help.openai.com/en/articles/10500283-deep-research-in-chatgpt",
+      "status": 200,
+      "chars": 7199,
+      "text_sha256": "996bf2519df7ace96913d0d95dafed2963007e391e3e6ea7a915d0ec984940b2"
+    },
+    {
+      "name": "plus",
+      "url": "https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus",
+      "status": 200,
+      "chars": 5613,
+      "text_sha256": "88dd78986d3749f1499c1b9a838d4faec10b6e069a86b9f9e0b6b9f48844fee0"
+    },
+    {
+      "name": "apps",
+      "url": "https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt",
+      "status": 200,
+      "chars": 12752,
+      "text_sha256": "31cff28f736d08f4c74858dd113110a56e809727ad47021ffa12bff3d1db0a2c"
+    },
+    {
+      "name": "codex-automations",
+      "url": "https://learn.chatgpt.com/docs/automations?surface=app",
+      "status": 200,
+      "chars": 15647,
+      "text_sha256": "6c8909cb9f5e691ec1d4955da53890a09660678d2efd2dad3f526ad948c94576"
+    },
+    {
+      "name": "codex-noninteractive",
+      "url": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "status": 200,
+      "chars": 13017,
+      "text_sha256": "018d473b016cfef0492392ac0c018b1af65dfc08566c4f87670451796917a15f"
+    },
+    {
+      "name": "codex-auth",
+      "url": "https://learn.chatgpt.com/docs/auth",
+      "status": 200,
+      "chars": 12830,
+      "text_sha256": "0a06ecfe3405939703651bf07ed65054d3f616405fa0631a2953136c1fdbf8cb"
+    },
+    {
+      "name": "codex-pricing",
+      "url": "https://learn.chatgpt.com/docs/pricing",
+      "status": 200,
+      "chars": 16189,
+      "text_sha256": "1134721c501177debf046b570c27a41a0044700e5a8ff221c28865c361be0c29"
+    },
+    {
+      "name": "codex-windows",
+      "url": "https://learn.chatgpt.com/docs/windows/windows-sandbox",
+      "status": 200,
+      "chars": 13843,
+      "text_sha256": "e1367a4deec33919f710943f8211a5f8cbc9907e3ffbbad138cd86f6c95c8aae"
+    },
+    {
+      "name": "codex-security",
+      "url": "https://learn.chatgpt.com/docs/security",
+      "status": 200,
+      "chars": 2507,
+      "text_sha256": "5c0ea8d7d53722929b527b8c10c11d388d271ca9f626c3490e0c582babb8295b"
+    },
+    {
+      "name": "pulse",
+      "url": "https://help.openai.com/en/articles/12293630-chatgpt-pulse",
+      "status": 404
+    }
+  ]
+}
