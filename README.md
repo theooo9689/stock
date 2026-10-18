@@ -2,6 +2,29 @@
 
 Sistema Python 3.12 para coletar dados de mercado, calcular indicadores, pesquisar notícias com a Responses API da OpenAI, comparar teses, gerar PDF A5 legível no celular e entregar resumo/ranking/documentos pelo bot existente. **Não executa ordens financeiras.**
 
+## Windows: iniciar automaticamente ao ligar o notebook
+
+Extraia o pacote e dê dois cliques em **INSTALAR_WINDOWS.cmd**. Pelo CMD, dentro da pasta extraída, o comando é:
+
+```bat
+INSTALAR_WINDOWS.cmd
+```
+
+O instalador usa Python 3.12+ (instala 3.12 pelo winget se necessário), cria um ambiente próprio, instala dependências com hashes e registra uma tarefa para o usuário atual. Não depende do GitHub Actions. Se a conta não permitir criar a tarefa, usa um atalho na pasta Inicializar. Não requer senha do Windows nem solicitar elevação de administrador para a configuração do radar.
+
+O programa é copiado para `%LOCALAPPDATA%\RadarInvestimentos`, portanto a pasta extraída em Downloads pode ser apagada após a instalação. **Um pacote privado configurado contém `.env`; não envie esse pacote a terceiros nem o publique no GitHub.** O código público tem apenas `.env.example`; quem usa esse código precisa preencher as três credenciais. A reinstalação preserva `.env` e banco já existentes no notebook.
+
+- Inicia ao **entrar na conta do Windows**, sem manter janela de CMD aberta. Ligar o aparelho sem entrar na conta não inicia a tarefa interativa.
+- Verifica o horário de **Brasília**, independentemente do fuso do Windows; pesquisa às 19h30 e envia às 20h30.
+- Se estiver desligado, suspenso ou sem sessão no horário, retoma quando puder executar. Ao ligar **depois das 20h30 no mesmo dia**, pesquisa/envia a edição daquele dia. Depois da meia-noite, segue a programação do novo dia; não inventa retrospectiva do dia perdido.
+- Reentrar no Windows ou verificar a cada minuto não repete uma edição já entregue. Envio com resultado incerto fica bloqueado para conferência manual.
+- Requer internet para dados/APIs e notebook ligado/acordado. Não há mecanismo para executar enquanto o computador está desligado.
+- Arquivos e logs ficam em `%LOCALAPPDATA%\RadarInvestimentos\data\logs\radar.log`; relatórios em `%LOCALAPPDATA%\RadarInvestimentos\reports`.
+
+Para enviar manualmente, use **EXECUTAR_AGORA.cmd**. Para remover a inicialização automática, use **DESINSTALAR_WINDOWS.cmd**; configuração e histórico são preservados. Se já usa um agendador em outro computador ou na nuvem, desative-o ao migrar para evitar dois ambientes enviando separadamente.
+
+Validação do instalador: a suíte inclui retomada após o horário, preparação única, edição já concluída, envio incerto e lock entre processos usando `portalocker` (Windows/Linux). O workflow de testes inclui Windows e parser PowerShell; instalar no notebook continua sendo a etapa executada pelo usuário, pois este workspace não tem acesso ao aparelho.
+
 ## Início rápido
 
 ```bash
@@ -69,7 +92,7 @@ Comparação de ETFs usa datas comuns, fechamento ajustado e USD; B3 é converti
 
 ### GitHub Actions
 
-O workflow `.github/workflows/daily.yml` pesquisa às **19h30** e entrega às **20h30 America/Sao_Paulo** (cron 22h30/23h30 UTC). Está preparado para execução manual (`prepare`/`deliver`). Cron do GitHub pode atrasar; não é garantia de entrega no minuto exato. Confira o fuso/cron se o Brasil voltar a adotar horário de verão. O processo residente abaixo calcula diretamente pelo fuso IANA.
+O workflow `.github/workflows/daily.yml` ficou **somente manual** (`prepare`/`deliver`) após a migração solicitada para o notebook. A automação Windows funciona sem secrets do GitHub. Para voltar a usar execução diária na nuvem, configure os secrets e um agendador antes de desativar o notebook; não ative duas instalações diárias independentes.
 
 No repositório, cadastre em **Settings → Secrets and variables → Actions**:
 

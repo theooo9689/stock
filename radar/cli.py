@@ -22,6 +22,7 @@ def main():
     sub.add_parser("test-telegram", help="Envia mensagem de teste usando destino configurado")
     sub.add_parser("status", help="Mostra custos e estado das entregas; não mostra credenciais")
     sub.add_parser("schedule", help="Processo residente para servidor ligado continuamente")
+    sub.add_parser("tick", help="Verifica o horário de Brasília e retoma a edição do dia após ligar o notebook")
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     # Prevent provider request URLs from entering logs.
@@ -53,10 +54,13 @@ def main():
         elif args.command == "schedule":
             from .scheduler import start
             start(settings)
+        elif args.command == "tick":
+            from .scheduler import tick
+            print(tick(settings))
     except Exception as exc:
         # Exception messages from SDKs may contain tokens or private destination IDs.
         logging.getLogger("radar").error("Operação interrompida (%s); detalhes privados não registrados", type(exc).__name__)
-        if args.command in ("run", "schedule"):
+        if args.command in ("run", "schedule", "tick"):
             try:
                 from .telegram import Telegram
                 Telegram(settings, store).alert(day, f"Execução interrompida ({type(exc).__name__}). O relatório não foi concluído/enviado integralmente. Verificar o ambiente do agendador.")

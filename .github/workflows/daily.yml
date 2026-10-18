@@ -1,10 +1,7 @@
 name: Radar diário
 
 on:
-  schedule:
-    # 19h30 e 20h30 America/Sao_Paulo (UTC-3). Guarda de fuso no job.
-    - cron: '30 22 * * *'
-    - cron: '30 23 * * *'
+  # A automacao diaria migrou para o notebook. Este workflow fica manual.
   workflow_dispatch:
     inputs:
       mode:

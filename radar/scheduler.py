@@ -8,7 +8,46 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
 
-from .pipeline import run
+from .pipeline import run, RunInProgress
+from .storage import Store
+
+
+def tick(settings, runner=None):
+    """One cheap check, suitable for Windows Task Scheduler and resume from sleep."""
+    runner = runner or run
+    now = settings.now()
+    day = now.date().isoformat()
+    hour, minute = map(int, settings.delivery_time.split(":"))
+    due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    prepare = due - timedelta(hours=1)
+    if now < prepare:
+        return "aguardando_horario"
+    store = Store(settings.data_dir / "radar.sqlite3")
+    states = store.delivery_states(day)
+    if states.get("scheduled-concluido") == "sent":
+        return "ja_entregue"
+    if any(k.startswith("scheduled-") and v == "sending" for k, v in states.items()):
+        logging.getLogger("radar").warning("Entrega incerta: verificar o Telegram antes de liberar reenvio")
+        return "entrega_incerta"
+    report = store.report(day)
+    prepared = False
+    if report:
+        try:
+            from datetime import datetime
+            generated = datetime.fromisoformat(report["generated_at"])
+            prepared = generated.tzinfo is not None and generated >= prepare
+        except (KeyError, ValueError):
+            pass
+    try:
+        if now < due:
+            if prepared:
+                return "pesquisa_pronta"
+            runner(settings, send=False, refresh=True, edition="scheduled")
+            return "pesquisado"
+        runner(settings, send=True, refresh=bool(report and not prepared), edition="scheduled")
+        return "entrega_processada"
+    except RunInProgress:
+        return "em_execucao"
 
 
 def start(settings):

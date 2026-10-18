@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import fcntl
 import logging
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import portalocker
 
 from .config import Watchlist
 from .calendar import official_events
@@ -21,17 +21,21 @@ from .telegram import Telegram
 log = logging.getLogger("radar")
 
 
+class RunInProgress(RuntimeError):
+    pass
+
+
 @contextmanager
 def run_lock(path):
-    with open(path, "a") as handle:
-        try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise RuntimeError("Já existe uma execução em andamento") from None
-        try:
-            yield
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
+    lock = portalocker.Lock(str(path), mode="a", timeout=0)
+    try:
+        lock.acquire()
+    except portalocker.exceptions.LockException:
+        raise RunInProgress("Já existe uma execução em andamento") from None
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 def compare(assets, previous):
@@ -164,6 +168,9 @@ def collect(settings, store, *, ai=True):
 
 def deliver(report, paths, telegram, edition="manual"):
     day = report["day"]
+    complete = f"{edition}-concluido"
+    if telegram.store.delivery_states(day).get(complete) == "sent":
+        return
     if report["status"] != "concluído":
         telegram.alert(day, f"Relatório {day} PARCIAL. Há dados ou pesquisa indisponíveis. Consulte as limitações no PDF; decisões sem cobertura suficiente ficaram em AGUARDAR.")
     summary, ranking = summaries(report)
@@ -171,6 +178,14 @@ def deliver(report, paths, telegram, edition="manual"):
     telegram.text(day, f"{edition}-ranking", ranking)
     telegram.send_once(day, f"{edition}-relatorio-completo", path=paths["pdf"], caption=f"Radar de Investimentos — {day} — relatório completo ({report['status']})")
     telegram.send_once(day, f"{edition}-dados-estruturados", path=paths["json"], caption=f"Dados estruturados — {day}")
+    from .telegram import chunks
+    expected = {f"{edition}-resumo-{i+1}" for i in range(len(chunks(summary)))}
+    expected.update(f"{edition}-ranking-{i+1}" for i in range(len(chunks(ranking))))
+    expected.update((f"{edition}-relatorio-completo", f"{edition}-dados-estruturados"))
+    states = telegram.store.delivery_states(day)
+    if all(states.get(part) == "sent" for part in expected):
+        telegram.store.claim_delivery(day, complete)
+        telegram.store.sent(day, complete, 0)
 
 
 def run(settings, *, send=False, ai=True, refresh=False, edition="manual"):

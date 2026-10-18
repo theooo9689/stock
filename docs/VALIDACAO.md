@@ -1,5 +1,7 @@
 # Validação da entrega — 2026-10-18
 
+Atualização posterior: a automação migrou para o notebook por solicitação do usuário. O agendador deste workspace foi interrompido e o workflow de envio ficou manual. Foram preparados instalador Windows, tarefa ao entrar na conta, retomada por minuto e pacote privado com configuração/histórico. A suíte passou a 49 testes; a sintaxe PowerShell foi validada pelo parser. A instalação no notebook requer executar `INSTALAR_WINDOWS.cmd` ali; não foi executada remotamente por esta sessão Linux. Consulte [WINDOWS.md](WINDOWS.md).
+
 Executada em 2026-10-18T17:48:46.780868-03:00.
 
 ## Evidências verificadas
