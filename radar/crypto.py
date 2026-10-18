@@ -59,7 +59,7 @@ class Crypto:
             try:
                 funding = self.http.get("https://fapi.binance.com/fapi/v1/premiumIndex", {"symbol": a["symbol"] + "USDT"}, ttl=900)
                 oi = self.http.get("https://fapi.binance.com/fapi/v1/openInterest", {"symbol": a["symbol"] + "USDT"}, ttl=900)
-                a["crypto"]["derivatives"] = {"funding_rate": float(funding["lastFundingRate"]), "open_interest_contracts": float(oi["openInterest"]),
+                a["crypto"]["derivatives"] = {"funding_rate": float(funding["lastFundingRate"]), "open_interest_base_asset": float(oi["openInterest"]), "open_interest_unit": a["symbol"],
                                                 "as_of_ms": oi.get("time"), "venue": "Binance USD-M, amostra de uma única bolsa", "source": "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest"}
             except Exception:
                 a["crypto"]["derivatives"] = {"missing": True}

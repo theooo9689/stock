@@ -9,6 +9,7 @@ from .config import Watchlist
 from .calendar import official_events
 from .crypto import Crypto
 from .http import HTTP
+from .grounding import verify_news
 from .market import Market, compare_etfs
 from .news import collect_news
 from .report import generate, summaries
@@ -50,6 +51,26 @@ def compare(assets, previous):
                         "previous_price": p0, "current_price": p1, "price_change": p1/p0-1 if p0 and p1 else None,
                         "score_change": a["ranking"]["score"]-old["ranking"]["score"], "new_facts": new})
     return changes, f"Comparação com {previous['day']}; mudanças de pontuação podem refletir cobertura e pesquisa, além de mercado."
+
+
+def grounded_overview(research, macro, assets):
+    """Publish macro numbers from collection, without recycling unchecked AI headlines."""
+    snapshot = []
+    for m in macro:
+        if m.get("price") is not None:
+            change = m.get("change_last_session")
+            delta = f"; variação no último candle {change:+.2%}" if change is not None else ""
+            snapshot.append(f"{m['name']}: {m['price']} {m.get('unit') or m.get('currency', '')}{delta}; cotação de {m.get('as_of', 'horário indisponível')}")
+    research["summaries"] = ["\n".join(snapshot)]
+    research["summary"] = (f"Foram coletados {len(assets)} ativos e confirmadas {len(research['news'])} notícias na verificação de fonte/data. "
+                           "Os horários das bolsas e de cripto são exibidos separadamente. Lacunas de fundamentos e pesquisa impedem recomendações sem cobertura suficiente.\n" + "\n".join(snapshot[:3]))
+    lookup = {m.get("ticker"): m for m in macro}
+    risks = ["Dados incompletos de valuation, composição de ETFs ou tokenomics podem alterar as teses; conferir a cobertura de cada ativo."]
+    if lookup.get("^VIX", {}).get("price") is not None:
+        risks.append(f"Volatilidade: VIX em {lookup['^VIX']['price']} pontos no último dado; choques podem ampliar oscilações e spreads.")
+    if lookup.get("^TNX", {}).get("price") is not None:
+        risks.append(f"Juros: Treasury de dez anos em {lookup['^TNX']['price']}% ao ano; juros maiores podem reduzir valuations de ativos de longa duração.")
+    research["risks"] = risks
 
 
 def collect(settings, store, *, ai=True):
@@ -99,11 +120,16 @@ def collect(settings, store, *, ai=True):
     research["summary"] = research["summaries"][0] if research["summaries"] else "Pesquisa aprofundada não concluída; não utilizar métricas isoladas como recomendação."
     research["sources"] = sorted(set(research["sources"]))
     research["events"] = calendar_events + [e for e in research["events"] if e not in calendar_events]
+    event_keys = set()
+    research["events"] = [e for e in research["events"] if not ((e["published_at"], e["source_url"]) in event_keys or event_keys.add((e["published_at"], e["source_url"])))]
     if calendar_events:
         research["sources"] = sorted(set(research["sources"] + ["https://www.bls.gov/schedule/news_release/bls.ics"]))
     research["risks"] = list(dict.fromkeys(research["risks"]))
     seen = set()
     research["news"] = [n for n in research["news"] if not (n["evidence"]["source_url"] in seen or seen.add(n["evidence"]["source_url"]))]
+    research["news"], grounding_limits = verify_news(settings, store, http, research["news"], day)
+    limitations.extend(grounding_limits)
+    grounded_overview(research, macro, assets)
     for a in assets:
         if a["symbol"] in theses:
             a["thesis"] = theses[a["symbol"]]
@@ -136,18 +162,18 @@ def collect(settings, store, *, ai=True):
                      "model": settings.model, "prices_per_million": {"input": settings.input_price, "output": settings.output_price}, "web_call_usd": settings.search_price}}
 
 
-def deliver(report, paths, telegram):
+def deliver(report, paths, telegram, edition="manual"):
     day = report["day"]
     if report["status"] != "concluído":
         telegram.alert(day, f"Relatório {day} PARCIAL. Há dados ou pesquisa indisponíveis. Consulte as limitações no PDF; decisões sem cobertura suficiente ficaram em AGUARDAR.")
     summary, ranking = summaries(report)
-    telegram.text(day, "resumo", summary)
-    telegram.text(day, "ranking", ranking)
-    telegram.send_once(day, "relatorio-completo", path=paths["pdf"])
-    telegram.send_once(day, "dados-estruturados", path=paths["json"])
+    telegram.text(day, f"{edition}-resumo", summary)
+    telegram.text(day, f"{edition}-ranking", ranking)
+    telegram.send_once(day, f"{edition}-relatorio-completo", path=paths["pdf"], caption=f"Radar de Investimentos — {day} — relatório completo ({report['status']})")
+    telegram.send_once(day, f"{edition}-dados-estruturados", path=paths["json"], caption=f"Dados estruturados — {day}")
 
 
-def run(settings, *, send=False, ai=True, refresh=False):
+def run(settings, *, send=False, ai=True, refresh=False, edition="manual"):
     store = Store(settings.data_dir / "radar.sqlite3")
     day = settings.now().date().isoformat()
     with run_lock(settings.data_dir / "run.lock"):
@@ -157,6 +183,6 @@ def run(settings, *, send=False, ai=True, refresh=False):
             store.save_report(day, report)
         paths = generate(report, settings.reports_dir)
         if send:
-            deliver(report, paths, Telegram(settings, store))
+            deliver(report, paths, Telegram(settings, store), edition=edition)
         log.info("Relatório %s: %s; %s ativos; USD estimados %.4f", day, report["status"], len(report["assets"]), report["cost"]["estimated_usd"])
         return report, paths

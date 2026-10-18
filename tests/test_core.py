@@ -61,6 +61,13 @@ def test_missing_indicators_do_not_invent_values():
     assert indicators(candles(np.arange(1.,81)))['sma200'] is None
 
 
+def test_macro_units_do_not_treat_yield_or_index_as_dollars():
+    from radar.market import MACRO_UNITS
+    assert MACRO_UNITS['^TNX'] == '% ao ano'
+    assert MACRO_UNITS['^GSPC'] == 'pontos'
+    assert MACRO_UNITS['BRL=X'] == 'BRL por USD'
+
+
 def test_perpetuity_dcf_closed_form_and_invalid_inputs():
     # Zero growth and zero terminal growth: finite horizon + perpetuity = FCF/r.
     assert dcf_equity(100,10,0,.1,0) == pytest.approx(100)

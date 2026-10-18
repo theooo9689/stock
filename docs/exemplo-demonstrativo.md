@@ -2,7 +2,7 @@
 
 DEMONSTRAÇÃO — DADOS SINTÉTICOS. NÃO USAR PARA DECISÕES.
 
-Status: DEMONSTRAÇÃO. Gerado em 2026-10-18T17:32:51.273355-03:00. Fuso de entrega: America/Sao_Paulo.
+Status: DEMONSTRAÇÃO. Gerado em 2026-10-18T17:45:49.991104-03:00. Fuso de entrega: America/Sao_Paulo.
 
 ## 1. RESUMO EXECUTIVO
 

@@ -65,6 +65,30 @@ def test_definitive_failure_releases_delivery(tmp_path):
     assert db.delivery_states('day') == {}
 
 
+def test_manual_report_does_not_block_scheduled_delivery(tmp_path):
+    from radar.pipeline import deliver
+    calls=[]
+    def handle(req):
+        calls.append(req)
+        return httpx.Response(200,json={'ok':True,'result':{'message_id':len(calls)}})
+    settings=Settings(telegram_token='test',telegram_chat='private')
+    telegram=Telegram(settings,Store(tmp_path/'state.db'),httpx.Client(transport=httpx.MockTransport(handle)))
+    report=demo_report(settings)
+    pdf=tmp_path/'demo.pdf';pdf.write_bytes(b'%PDF synthetic')
+    data=tmp_path/'demo.json';data.write_text('{}')
+    paths={'pdf':pdf,'json':data}
+    deliver(report,paths,telegram,edition='manual')
+    first=len(calls)
+    deliver(report,paths,telegram,edition='manual')
+    assert len(calls)==first
+    deliver(report,paths,telegram,edition='scheduled')
+    assert len(calls)>first
+    assert sum(r.url.path.endswith('/sendDocument') for r in calls)==4
+    second=len(calls)
+    deliver(report,paths,telegram,edition='scheduled')
+    assert len(calls)==second
+
+
 def test_api_retry_cache_and_errors(tmp_path,monkeypatch):
     monkeypatch.setattr('radar.http.time.sleep',lambda _:None)
     n=0

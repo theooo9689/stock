@@ -62,14 +62,14 @@ class Telegram:
             raise TelegramError(f"Telegram HTTP {r.status_code}", ambiguous=r.status_code >= 500)
         raise TelegramError("Limite de tentativas do Telegram atingido")
 
-    def send_once(self, day, part, text=None, path=None):
+    def send_once(self, day, part, text=None, path=None, caption=None):
         if not self.store.claim_delivery(day, part):
             return False
         try:
             if path:
                 path = Path(path)
                 # Bytes allow safe retry after an explicit Telegram 429.
-                msg = self.call("sendDocument", {"caption": part}, {"document": (path.name, path.read_bytes(), "application/pdf" if path.suffix == ".pdf" else "application/json")})
+                msg = self.call("sendDocument", {"caption": caption or path.name}, {"document": (path.name, path.read_bytes(), "application/pdf" if path.suffix == ".pdf" else "application/json")})
             else:
                 msg = self.call("sendMessage", {"text": text, "link_preview_options": '{"is_disabled":true}'})
             self.store.sent(day, part, msg)

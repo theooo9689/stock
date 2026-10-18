@@ -14,6 +14,9 @@ from .technical import indicators, returns
 
 MACRO = {"S&P 500": "^GSPC", "Nasdaq": "^IXIC", "Russell 2000": "^RUT", "VIX": "^VIX",
          "Treasury 10 anos (%)": "^TNX", "USD/BRL": "BRL=X", "Dólar DXY": "DX-Y.NYB", "Ouro futuro (USD)": "GC=F", "Petróleo WTI futuro (USD)": "CL=F"}
+MACRO_UNITS = {"^GSPC": "pontos", "^IXIC": "pontos", "^RUT": "pontos", "^VIX": "pontos",
+               "^TNX": "% ao ano", "BRL=X": "BRL por USD", "DX-Y.NYB": "pontos",
+               "GC=F": "USD por onça troy", "CL=F": "USD por barril"}
 
 
 def market_status(category, quote_time, now=None):
@@ -163,6 +166,8 @@ class Market:
                 result["industry"] = info.get("industry")
                 if kind == "stocks":
                     result["valuation"] = value_range(result["fundamentals"], self.watchlist.valuation)
+                    if info.get("sector") in ("Financial Services", "Real Estate"):
+                        result["valuation"] = {"available": False, "reason": "DCF genérico de FCF inadequado para bancos, seguradoras e imóveis/REITs; exige modelo setorial (dividendos, capital regulatório ou NAV/AFFO)."}
                     # Avoid comparing monetary values from different currencies.
                     if info.get("financialCurrency") and info.get("financialCurrency") != result.get("quote", {}).get("currency"):
                         result["valuation"] = {"available": False, "reason": "Moedas dos demonstrativos e da cotação diferentes; conversão precisa ser auditada"}
@@ -235,7 +240,7 @@ class Market:
         for name, ticker in MACRO.items():
             try:
                 frame, meta, url = self.history(ticker)
-                rows.append({"name": name, "ticker": ticker, "price": meta.get("regularMarketPrice"), "currency": meta.get("currency"),
+                rows.append({"name": name, "ticker": ticker, "price": meta.get("regularMarketPrice"), "currency": meta.get("currency"), "unit": MACRO_UNITS.get(ticker),
                              "as_of": datetime.fromtimestamp(meta["regularMarketTime"], timezone.utc).isoformat(),
                              "change_last_session": number(frame.close.iloc[-1] / frame.close.iloc[-2] - 1), "source": url})
             except Exception as exc:

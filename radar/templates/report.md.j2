@@ -28,11 +28,14 @@ Horizonte: {{ n.horizon }}
 HIPÓTESE ALTERNATIVA: {{ n.alternative }}
 Consequência prática: {{ n.practical }}
 
+{% if n.get('verification') %}TRECHO VERIFICADO NA FONTE: {{ n.verification.supporting_quote }}
+
+{% endif %}
 {% else %}Não há notícias recentes confirmadas pela pesquisa disponível. Isso não comprova ausência de eventos.
 
 {% endfor %}## 4. BOLSAS, JUROS, MOEDAS E COMMODITIES
 
-{% for m in r.macro %}{{ m.name }}: {{ m.get('price')|fmt }} {{ m.get('currency', '') }}. Último dado: {{ m.get('as_of', 'não disponível') }}. Variação entre últimos candles: {{ m.get('change_last_session')|fmt }} (fração). Fonte: {{ m.get('source', 'indisponível') }}. {{ m.get('error', '') }}
+{% for m in r.macro %}{{ m.name }}: {{ m.get('price')|fmt }} {{ m.get('unit',m.get('currency','')) }}. Último dado: {{ m.get('as_of', 'não disponível') }}. Variação entre últimos candles: {{ m.get('change_last_session')|fmt }} (fração). Fonte: {{ m.get('source', 'indisponível') }}. {{ m.get('error', '') }}
 
 {% endfor %}## 5–6. RANKINGS DE AÇÕES AMERICANAS E ETFs
 

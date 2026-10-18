@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from radar.config import Settings
-from radar.research import Research, ResearchResult
+from radar.research import Research, ResearchResult, citation_key
 from radar.storage import Store
 
 
@@ -15,6 +15,23 @@ def test_strict_schema_for_all_structured_objects():
         if model.get('type') == 'object':
             assert model['additionalProperties'] is False
             assert set(model['required']) == set(model['properties'])
+
+
+def test_citation_normalization_keeps_meaningful_query():
+    assert citation_key('https://example.com/story/?utm_source=openai') == citation_key('https://example.com/story')
+    assert citation_key('https://example.com/quote?symbol=EME&utm_source=openai') != citation_key('https://example.com/quote?symbol=EEM')
+
+
+def test_news_grounding_requires_exact_quote_current_date_and_support():
+    from radar.grounding import Check, passes
+    document='The company reported revenue of 100 million dollars on October 18, 2026.'
+    check=Check(supported=True,supporting_quote=document,publication_date='2026-10-18',reason='Supported')
+    assert passes(check,document,'2026-10-18')
+    assert not passes(check,document,'2026-11-18')
+    check.supported=False
+    assert not passes(check,document,'2026-10-18')
+    check.supported=True;check.supporting_quote='A completely invented quotation about the Federal Reserve.'
+    assert not passes(check,document,'2026-10-18')
 
 
 def test_research_filters_uncited_sources_and_saves_cost(tmp_path):
@@ -37,7 +54,7 @@ def test_research_filters_uncited_sources_and_saves_cost(tmp_path):
         output=[SimpleNamespace(type='web_search_call')]
         output_text=json.dumps(payload)
         def model_dump(self,mode=None):
-            return {'output':[{'type':'web_search_call','action':{'sources':[{'url':good}]}}]}
+            return {'output':[{'type':'web_search_call','action':{'sources':[{'url':good+'?utm_source=openai'}]}}]}
         def model_dump_json(self,indent=None):
             return json.dumps(self.model_dump())
     class Responses:

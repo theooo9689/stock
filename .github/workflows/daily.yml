@@ -82,7 +82,7 @@ jobs:
           deliver = (os.getenv('MANUAL_MODE') == 'deliver') if event == 'workflow_dispatch' else os.getenv('EVENT_SCHEDULE') == '30 23 * * *'
           if deliver and event == 'schedule' and now.hour < 20:
               raise SystemExit('Fuso/cron incompatível: não entregar antes de 20h30 de Brasília')
-          run(Settings.from_env(), send=deliver)
+          run(Settings.from_env(), send=deliver, refresh=not deliver, edition='scheduled')
           PY
       - name: Alerta de falha do workflow
         if: failure()
