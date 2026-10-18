@@ -48,7 +48,11 @@ def messages(report):
     parts.append('<b>📰 NOTÍCIAS QUE IMPORTAM</b>')
     news=[n for n in report['research'].get('news',[]) if n.get('verification',{}).get('review',{}).get('approved')]
     for n in news[:3]:parts.append(f'• <a href="{esc(n["evidence"]["source_url"])}">{esc(short(n["title"],110))}</a> — {esc(short(n["interpretation"],170))}')
-    if not news:parts.append('A verificação de contexto não foi concluída. O boletim factual e as fontes coletadas estão no PDF; não inferimos ausência de acontecimentos.')
+    if not news:
+        parts.append('<i>Manchetes das fontes; impactos ainda sem revisão.</i>')
+        factual=[n for n in report.get('headlines',[]) if any(k in n['title'].lower() for k in ('fed','oil','china','budget','tax','inflation','earnings','hormuz','bitcoin'))][:3]
+        for n in factual:parts.append('• <a href="'+esc(n['url'])+'">'+esc(short(n['title'],150))+'</a>\n'+esc(stamp(n.get('published_at'))))
+        if not factual:parts.append('O boletim factual e as fontes coletadas estão no PDF; a falta de revisão não indica ausência de acontecimentos.')
     parts.append('<b>🎯 MELHORES OPORTUNIDADES</b>')
     for a in selected[:5]:parts.append(f'<b>{esc(a["symbol"])}</b> — {esc(short(a["thesis"]["premium"]["why_now"],160))}')
     if not selected:parts.append('Nenhuma compra sustentada por dados, tese e revisão suficientes nesta edição. Preço baixo isoladamente não muda essa conclusão.')
